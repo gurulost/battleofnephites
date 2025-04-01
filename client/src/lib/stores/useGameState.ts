@@ -184,7 +184,44 @@ export const useGameState = create<GameState>()(
     },
     
     startGame: () => {
-      set({ gamePhase: 'playing' });
+      import('../stores/useGameSetup').then(({ useGameSetup }) => {
+        import('../../game/utils/MapGenerator').then(({ generateMap, generatePlayers }) => {
+          // Get game setup options
+          const { 
+            selectedMode, 
+            selectedFaction, 
+            opponents, 
+            difficulty 
+          } = useGameSetup.getState();
+          
+          if (!selectedFaction || !selectedMode) {
+            console.error('Cannot start game: faction or mode not selected');
+            return;
+          }
+          
+          // Generate map based on opponent count
+          const map = generateMap(opponents);
+          
+          // Generate players based on faction selection and opponent count
+          const players = generatePlayers(selectedFaction, opponents);
+          
+          // Update the game state with the new setup
+          set({ 
+            gamePhase: 'playing',
+            players,
+            currentPlayer: players[0], // Human player is always first
+            map
+          });
+          
+          // Send the map and player setup to Phaser
+          EventBridge.emit('ui:setupGame', {
+            map,
+            players,
+            gameMode: selectedMode,
+            difficulty
+          });
+        });
+      });
     }
   }))
 );

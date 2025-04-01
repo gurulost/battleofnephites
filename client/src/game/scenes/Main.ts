@@ -100,7 +100,48 @@ export default class MainScene extends Phaser.Scene {
     this.updateUI();
   }
   
-  initializePlayers() {
+  initializePlayers(customPlayers = null) {
+    // If custom players are provided (from game setup), use those
+    if (customPlayers && Array.isArray(customPlayers) && customPlayers.length > 0) {
+      this.players = customPlayers;
+      
+      // Update map dimensions based on number of players
+      if (customPlayers.length > 1) {
+        // Adjust map size based on opponent count (customPlayers.length - 1)
+        const opponentCount = customPlayers.length - 1;
+        switch (opponentCount) {
+          case 1:
+            this.mapWidth = 15;
+            this.mapHeight = 15;
+            break;
+          case 2:
+            this.mapWidth = 20;
+            this.mapHeight = 20;
+            break;
+          case 3:
+            this.mapWidth = 25;
+            this.mapHeight = 25;
+            break;
+          case 4:
+            this.mapWidth = 30;
+            this.mapHeight = 30;
+            break;
+          case 5:
+            this.mapWidth = 35;
+            this.mapHeight = 35;
+            break;
+          default:
+            this.mapWidth = 15;
+            this.mapHeight = 15;
+        }
+      }
+      
+      // Set current player to human (first player)
+      this.currentPlayerIndex = 0;
+      return;
+    }
+    
+    // Default initialization if no custom setup
     // Human player (Nephites)
     this.players.push({
       id: 'player1',
@@ -366,6 +407,41 @@ export default class MainScene extends Phaser.Scene {
     return building;
   }
   
+  /**
+   * Resets the game state for a new game
+   */
+  resetGameState() {
+    // Clear all entities
+    this.units.forEach(unit => unit.destroy());
+    this.buildings.forEach(building => building.destroy());
+    
+    // Reset arrays
+    this.units = [];
+    this.buildings = [];
+    this.players = [];
+    this.selectedEntity = null;
+    this.highlightedTiles = [];
+    
+    // Reset turn counter
+    this.turn = 1;
+    this.currentPlayerIndex = 0;
+    
+    // Clear any existing tiles
+    if (this.tiles.length > 0) {
+      for (let y = 0; y < this.tiles.length; y++) {
+        for (let x = 0; x < this.tiles[y].length; x++) {
+          if (this.tiles[y][x]) {
+            this.tiles[y][x].destroy();
+          }
+        }
+      }
+      this.tiles = [];
+    }
+    
+    // Clear any overlays
+    this.movementOverlay.clear();
+  }
+  
   setupInputHandlers() {
     // Handle tile and entity clicks
     this.input.on('gameobjectdown', (pointer: Phaser.Input.Pointer, gameObject: any) => {
@@ -508,6 +584,39 @@ export default class MainScene extends Phaser.Scene {
   
   setupEventHandlers() {
     // Listen for events from React UI
+    
+    // Custom game setup from game options
+    EventBridge.on('ui:setupGame', (data: any) => {
+      console.log('Custom game setup received:', data);
+      
+      // Handle custom game setup - recreate the map with the new settings
+      if (data.map) {
+        // Reset game state
+        this.resetGameState();
+        
+        // Set map dimensions
+        this.mapWidth = data.map.width;
+        this.mapHeight = data.map.height;
+        
+        // Initialize players with custom data
+        this.initializePlayers(data.players);
+        
+        // Recreate the map
+        const worldCenterX = this.cameras.main.width / 2;
+        const worldCenterY = this.cameras.main.height / 3;
+        this.createMap(worldCenterX, worldCenterY);
+        
+        // Place initial entities based on player count
+        this.placeInitialEntities();
+        
+        // Reset pathfinder with new map size
+        this.pathFinder = new PathFinder(this.mapWidth, this.mapHeight);
+        this.updatePathfinderWalkability();
+        
+        // Update UI
+        this.updateUI();
+      }
+    });
     
     // Train unit action
     EventBridge.on('game:trainUnit', (data: { buildingId: string, unitType: UnitType }) => {
