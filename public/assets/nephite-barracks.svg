@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nephiteGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3F51B5"/>
+      <stop offset="100%" stop-color="#303F9F"/>
+    </linearGradient>
+    <linearGradient id="woodGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#795548"/>
+      <stop offset="100%" stop-color="#5D4037"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <!-- Base -->
+    <rect x="8" y="44" width="48" height="8" fill="url(#woodGradient)"/>
+    
+    <!-- Main structure -->
+    <rect x="12" y="24" width="40" height="20" fill="url(#nephiteGradient)"/>
+    
+    <!-- Roof -->
+    <rect x="8" y="20" width="48" height="4" fill="url(#woodGradient)"/>
+    
+    <!-- Door -->
+    <rect x="28" y="36" width="8" height="16" fill="#5D4037"/>
+    
+    <!-- Windows -->
+    <rect x="16" y="30" width="6" height="6" fill="#E3F2FD"/>
+    <rect x="42" y="30" width="6" height="6" fill="#E3F2FD"/>
+    
+    <!-- Weapons rack -->
+    <rect x="14" y="14" width="36" height="2" fill="#B0BEC5"/>
+    <rect x="20" y="8" width="2" height="12" fill="#B0BEC5"/>
+    <rect x="30" y="8" width="2" height="12" fill="#B0BEC5"/>
+    <rect x="40" y="8" width="2" height="12" fill="#B0BEC5"/>
+  </g>
+</svg>

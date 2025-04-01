@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="64" height="32" viewBox="0 0 64 32" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grassGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7CBA5B"/>
+      <stop offset="100%" stop-color="#5BA53A"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <!-- Isometric tile shape -->
+    <path d="M32,0 L64,16 L32,32 L0,16 Z" fill="url(#grassGradient)"/>
+    
+    <!-- Food resource indicator -->
+    <g transform="translate(32, 16)" fill="#FFEB3B" opacity="0.7">
+      <circle cx="0" cy="0" r="7"/>
+      <path d="M-4,-1 L4,-1 L4,1 L-4,1 Z" fill="#FFF9C4"/>
+      <path d="M-1,-4 L1,-4 L1,4 L-1,4 Z" fill="#FFF9C4"/>
+    </g>
+  </g>
+</svg>

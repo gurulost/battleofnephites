@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Building, UnitType } from '../types/game';
 import { useGameState } from '../lib/stores/useGameState';
+import { useGame } from '../lib/stores/useGame';
 import { X, User, Swords, Crosshair } from 'lucide-react';
 
 interface TrainUnitMenuProps {
@@ -12,6 +13,7 @@ interface TrainUnitMenuProps {
 
 export const TrainUnitMenu = ({ onClose, building }: TrainUnitMenuProps) => {
   const { currentPlayer, trainUnit } = useGameState();
+  const { playSound } = useGame();
   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
   
   // Determine available units based on building type
@@ -58,6 +60,9 @@ export const TrainUnitMenu = ({ onClose, building }: TrainUnitMenuProps) => {
   const handleTrain = () => {
     if (!selectedUnit) return;
     
+    // Play unit creation sound effect
+    playSound('unitCreated');
+    
     trainUnit(selectedUnit, building.id);
     onClose();
   };
@@ -85,7 +90,12 @@ export const TrainUnitMenu = ({ onClose, building }: TrainUnitMenuProps) => {
                     ${selectedUnit === unit.type ? 'border-blue-500 bg-slate-600' : 'border-slate-600'}
                     ${!affordable ? 'opacity-50' : ''}
                   `}
-                  onClick={() => affordable && setSelectedUnit(unit.type)}
+                  onClick={() => {
+                    if (affordable) {
+                      setSelectedUnit(unit.type);
+                      playSound('select');
+                    }
+                  }}
                 >
                   <div className="bg-slate-800 p-2 rounded">
                     {unit.icon}

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Unit } from '../types/game';
 import { useGameState } from '../lib/stores/useGameState';
+import { useGame } from '../lib/stores/useGame';
 import { X, Building, Dumbbell } from 'lucide-react';
 
 interface BuildMenuProps {
@@ -12,6 +13,7 @@ interface BuildMenuProps {
 
 export const BuildMenu = ({ onClose, workerUnit }: BuildMenuProps) => {
   const { currentPlayer, buildBuilding } = useGameState();
+  const { playSound } = useGame();
   const [selectedBuilding, setSelectedBuilding] = useState<'city' | 'barracks' | null>(null);
   
   // Building costs and requirements
@@ -56,6 +58,9 @@ export const BuildMenu = ({ onClose, workerUnit }: BuildMenuProps) => {
     // For this simple MVP, just use the first position (the game logic will validate)
     const buildPosition = adjacentPositions[0];
     
+    // Play build sound effect
+    playSound('build');
+    
     buildBuilding(selectedBuilding, buildPosition.x, buildPosition.y);
     onClose();
   };
@@ -82,7 +87,12 @@ export const BuildMenu = ({ onClose, workerUnit }: BuildMenuProps) => {
                   ${selectedBuilding === building.type ? 'border-blue-500 bg-slate-600' : 'border-slate-600'}
                   ${!affordable ? 'opacity-50' : ''}
                 `}
-                onClick={() => affordable && setSelectedBuilding(building.type)}
+                onClick={() => {
+                  if (affordable) {
+                    setSelectedBuilding(building.type);
+                    playSound('select');
+                  }
+                }}
               >
                 <div className="bg-slate-800 p-2 rounded">
                   {building.icon}

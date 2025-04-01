@@ -34,12 +34,38 @@ export default class MainScene extends Phaser.Scene {
   
   constructor() {
     super('MainScene');
+    
+    // Initialize properties to avoid LSP errors
+    this.pathFinder = new PathFinder(0, 0); // Will be properly initialized in create()
+    this.movementOverlay = undefined as any; // Will be initialized in create()
+    this.selectionIndicator = undefined as any; // Will be initialized when needed
   }
   
   preload() {
-    // Load the attack and gather indicators
+    // Load the tile assets
+    this.load.svg('grass', 'assets/grass.svg');
+    this.load.svg('forest', 'assets/forest.svg');
+    this.load.svg('hill', 'assets/hill.svg');
+    
+    // Load the action indicators
     this.load.svg('attack-indicator', 'assets/attack-indicator.svg');
     this.load.svg('gather-indicator', 'assets/gather-indicator.svg');
+    
+    // Load Nephite unit assets
+    this.load.svg('nephite-worker', 'assets/nephite-worker.svg');
+    this.load.svg('nephite-melee', 'assets/nephite-melee.svg');
+    this.load.svg('nephite-ranged', 'assets/nephite-ranged.svg');
+    
+    // Load Lamanite unit assets
+    this.load.svg('lamanite-worker', 'assets/lamanite-worker.svg');
+    this.load.svg('lamanite-melee', 'assets/lamanite-melee.svg');
+    this.load.svg('lamanite-ranged', 'assets/lamanite-ranged.svg');
+    
+    // Load building assets
+    this.load.svg('nephite-city', 'assets/nephite-city.svg');
+    this.load.svg('nephite-barracks', 'assets/nephite-barracks.svg');
+    this.load.svg('lamanite-city', 'assets/lamanite-city.svg');
+    this.load.svg('lamanite-barracks', 'assets/lamanite-barracks.svg');
   }
 
   create() {

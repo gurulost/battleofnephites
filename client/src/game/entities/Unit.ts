@@ -73,18 +73,12 @@ export default class Unit extends Phaser.GameObjects.Container {
     this.movesLeft = this.speed;
     this.actionsLeft = 1;
     
-    // Create sprite based on unit type
-    this.sprite = scene.add.image(0, 0, type);
+    // Create sprite based on unit type and faction
+    const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
+    this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
     
     // Set origin to bottom-center for isometric positioning
     this.sprite.setOrigin(0.5, 1);
-    
-    // Apply player-specific tint
-    if (this.playerId === 'player1') {
-      this.sprite.setTint(0x3498db); // Blue for player 1
-    } else {
-      this.sprite.setTint(0xe74c3c); // Red for player 2/AI
-    }
     
     // Create health bar
     this.healthBar = scene.add.graphics();

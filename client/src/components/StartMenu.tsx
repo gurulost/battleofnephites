@@ -1,18 +1,61 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
-import { SwordsIcon } from 'lucide-react';
+import { SwordsIcon, Music, Music2, Volume2, VolumeX } from 'lucide-react';
+import { useGame } from '../lib/stores/useGame';
 
 interface StartMenuProps {
   onStartGame: () => void;
 }
 
 export const StartMenu = ({ onStartGame }: StartMenuProps) => {
+  const {
+    musicPlaying,
+    soundEffectsEnabled,
+    toggleMusic,
+    toggleSoundEffects,
+    playSound
+  } = useGame();
+  
+  // Function to handle start game with sound effect
+  const handleStartGame = () => {
+    playSound('select');
+    onStartGame();
+  };
+  
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-gradient-to-b from-slate-900 to-slate-700">
       <Card className="w-full max-w-md mx-4 bg-slate-800 text-white border-none shadow-lg">
         <CardHeader className="text-center pb-2">
-          <div className="flex justify-center mb-2">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex gap-1">
+              <Button 
+                size="icon"
+                variant="outline" 
+                onClick={() => {
+                  toggleMusic(); 
+                  playSound('select');
+                }}
+                className="h-8 w-8 rounded-full"
+              >
+                {musicPlaying ? <Music className="h-4 w-4" /> : <Music2 className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+              <Button 
+                size="icon"
+                variant="outline" 
+                onClick={() => {
+                  // Play sound before toggling if sound is enabled
+                  if (soundEffectsEnabled) {
+                    playSound('select');
+                  }
+                  toggleSoundEffects();
+                }}
+                className="h-8 w-8 rounded-full"
+              >
+                {soundEffectsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+            </div>
             <SwordsIcon className="h-12 w-12 text-primary" />
+            <div className="w-16"></div> {/* Empty div for spacing */}
           </div>
           <CardTitle className="text-3xl font-bold">Battles of the Covenant</CardTitle>
           <CardDescription className="text-slate-300">
@@ -50,7 +93,7 @@ export const StartMenu = ({ onStartGame }: StartMenuProps) => {
             </div>
             
             <Button 
-              onClick={onStartGame}
+              onClick={handleStartGame}
               className="w-full mt-2 bg-primary hover:bg-primary/90 text-white"
               size="lg"
             >

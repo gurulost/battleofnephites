@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lamaniteGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D32F2F"/>
+      <stop offset="100%" stop-color="#B71C1C"/>
+    </linearGradient>
+    <linearGradient id="stoneGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8D6E63"/>
+      <stop offset="100%" stop-color="#6D4C41"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <!-- Base -->
+    <rect x="8" y="44" width="48" height="12" fill="url(#stoneGradient)"/>
+    
+    <!-- Main structure (Pyramid-like) -->
+    <path d="M14,44 L50,44 L40,24 L24,24 Z" fill="url(#lamaniteGradient)"/>
+    
+    <!-- Top structure -->
+    <rect x="26" y="14" width="12" height="10" fill="url(#lamaniteGradient)"/>
+    <path d="M26,14 L32,6 L38,14" fill="#B71C1C"/>
+    
+    <!-- Door -->
+    <rect x="28" y="36" width="8" height="20" fill="#5D4037"/>
+    
+    <!-- Windows -->
+    <rect x="20" y="30" width="6" height="6" fill="#FFEBEE"/>
+    <rect x="38" y="30" width="6" height="6" fill="#FFEBEE"/>
+    
+    <!-- Decorative elements -->
+    <circle cx="32" cy="20" r="3" fill="#FFEBEE"/>
+    <path d="M32,6 L35,3 L29,3 Z" fill="#B71C1C"/>
+  </g>
+</svg>

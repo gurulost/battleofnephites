@@ -5,12 +5,14 @@ import { StartMenu } from './components/StartMenu';
 import { GameConfig } from './game/config';
 import { EventBridge } from './lib/events/EventBridge';
 import { useGameState } from './lib/stores/useGameState';
+import { useGame } from './lib/stores/useGame';
 
 function App() {
   const [gameStarted, setGameStarted] = useState(false);
   const gameRef = useRef<HTMLDivElement>(null);
   const gameInstance = useRef<Phaser.Game | null>(null);
   const { gamePhase, startGame } = useGameState();
+  const { start: startUIGame } = useGame();
 
   // Initialize the Phaser game when component mounts
   useEffect(() => {
@@ -38,8 +40,9 @@ function App() {
     // Emit event to Phaser game to start the game
     EventBridge.emit('ui:startGame', {});
     
-    // Update global game state
+    // Update both game state stores
     startGame();
+    startUIGame();
   };
 
   return (

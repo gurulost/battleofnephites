@@ -9,7 +9,8 @@ import { EventBridge } from '../lib/events/EventBridge';
 import { Button } from './ui/button';
 import { Building, Unit } from '../types/game';
 import { Card, CardContent } from './ui/card';
-import { Swords, Shield, Heart, Wifi } from 'lucide-react';
+import { Swords, Shield, Heart, Volume2, VolumeX, Music, Music2 } from 'lucide-react';
+import { useGame } from '../lib/stores/useGame';
 
 // Combat prediction display component
 const CombatPredictor = ({ 
@@ -94,6 +95,14 @@ export const GameUI = () => {
     endTurn,
     players
   } = useGameState();
+  
+  const {
+    musicPlaying,
+    soundEffectsEnabled,
+    toggleMusic,
+    toggleSoundEffects,
+    playSound
+  } = useGame();
   
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showTrainMenu, setShowTrainMenu] = useState(false);
@@ -217,10 +226,41 @@ export const GameUI = () => {
       {/* Top bar with resources and turn info */}
       <div className="absolute top-0 left-0 right-0 p-4 bg-slate-800 bg-opacity-80 pointer-events-auto">
         <div className="flex justify-between items-center">
-          <ResourceDisplay 
-            food={currentPlayer.resources.food}
-            production={currentPlayer.resources.production}
-          />
+          <div className="flex gap-2 items-center">
+            <ResourceDisplay 
+              food={currentPlayer.resources.food}
+              production={currentPlayer.resources.production}
+            />
+            
+            {/* Audio controls */}
+            <div className="flex gap-1 ml-4">
+              <Button 
+                size="icon"
+                variant="outline" 
+                onClick={() => {
+                  toggleMusic(); 
+                  playSound('select');
+                }}
+                className="h-8 w-8 rounded-full"
+              >
+                {musicPlaying ? <Music className="h-4 w-4" /> : <Music2 className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+              <Button 
+                size="icon"
+                variant="outline" 
+                onClick={() => {
+                  // Play sound before toggling if sound is enabled
+                  if (soundEffectsEnabled) {
+                    playSound('select');
+                  }
+                  toggleSoundEffects();
+                }}
+                className="h-8 w-8 rounded-full"
+              >
+                {soundEffectsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+            </div>
+          </div>
           
           <TurnDisplay 
             turn={turn}
@@ -229,7 +269,10 @@ export const GameUI = () => {
           />
           
           <Button 
-            onClick={handleEndTurnClick}
+            onClick={() => {
+              handleEndTurnClick();
+              playSound('select');
+            }}
             className="bg-primary hover:bg-primary/90 text-white"
           >
             End Turn
