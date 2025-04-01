@@ -1,0 +1,59 @@
+Simplified Design Brief: Battles of the Covenant (MVP)
+
+To the Developer:
+
+This document outlines the core requirements for building the first playable version (MVP) of "Battles of the Covenant". Please focus on implementing these fundamentals first. We can add more complex features and polish later.
+
+1. Project Goal:
+Create a web-based strategy game inspired by The Battle of Polytopia, set in the ancient Americas (Book of Mormon theme). Players manage resources, build units, explore, and fight.
+
+2. Core Gameplay Loop (MVP Focus):
+
+Player starts with one city and one basic unit (e.g., a Worker).
+Explore a grid-based isometric map.
+Gather basic resources (Food, Production/Materials).
+Build essential buildings (e.g., Barracks).
+Train basic combat units (e.g., Melee, Ranged).
+Move units on the grid using pathfinding.
+Engage in simple turn-based or RTWP combat (attack/defense calculations).
+Capture or destroy the enemy's starting city to win (basic win condition).
+3. Key Requirements & Constraints (Non-Negotiable):
+
+Platform: Web Browser (HTML5/JavaScript/TypeScript).
+Visual Style: Strictly 2.5D Isometric. Think clean, stylized, readable graphics (like Polytopia). No 3D rendering. Focus on clear sprites for units, buildings, and terrain on a grid.
+Engine: Phaser 3 (for game logic, rendering, map, units).
+UI: React (for HUD, menus, selection panels) layered over the Phaser canvas. Use shadcn/ui components.
+Communication (Phaser <-> React): Use a centralized event emitter. Phaser sends game state updates (e.g., resources changed, unit selected); React sends commands (e.g., train unit, build building).
+State Management (UI): Zustand.
+Build Tool: Vite.
+4. MVP Feature Focus (Phase 1):
+
+Map: Render a basic isometric tilemap (e.g., grass, forest, hill tiles). Define walkability.
+Resources: Implement Food and Production. Track per player. Basic gathering by worker units.
+Entities (Units/Buildings):
+Implement base classes for Unit and Building.
+Need: Worker, Melee Unit, Ranged Unit.
+Need: City Center (start building), Barracks (train units).
+Basic properties: Health, Attack, Defense, Speed.
+Basic isometric sprites with idle/move/attack states (animations can be simple initially).
+Input/Control:
+Click to select units/buildings.
+Right-click for context actions (Move to tile, Attack enemy).
+Basic UI buttons in React panel for Train Unit / Build Building actions.
+Movement: Grid-based pathfinding (use easystar.js or built-in Phaser options). Units follow path.
+Combat: Simple resolution: Attacker's Attack vs. Defender's Defense. Apply damage. Unit dies at 0 HP. Basic visual feedback (sprite change/simple effect).
+Building System: Basic placement (select building from UI, place on valid map tile, deduct resources). Basic unit queuing in Barracks.
+Faction: Implement one faction to start (e.g., Nephites) with its basic units. Faction differences can come later.
+UI (React):
+Basic HUD showing Resources.
+Selection Panel showing selected unit/building info (HP, stats) and available actions (buttons).
+Minimal menus (Start Game).
+NO Multiplayer: Focus entirely on single-player functionality for the MVP.
+NO Complex Mechanics: Ignore Faith, Pride, Dissent, Conversion, advanced tech trees, complex faction abilities for now.
+5. Core Technical Architecture Summary:
+
+Single Page App structure.
+Phaser handles the game world rendering (isometric map, units, effects) on a canvas.
+React handles all UI elements (HUD, panels, menus) as HTML overlay.
+An Event Emitter bridge connects Phaser game events to React UI updates and React UI actions back to Phaser game logic.
+Goal for this Phase: Get a playable single-player loop running with one faction, basic units/buildings, resource gathering, movement, and combat on an isometric map, using the specified tech stack and visual style.
