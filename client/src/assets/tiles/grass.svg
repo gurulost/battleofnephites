@@ -1,0 +1,15 @@
+<svg width="64" height="32" viewBox="0 0 64 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Isometric grass tile -->
+  <polygon points="32,0 64,16 32,32 0,16" fill="#7EC850"/>
+  <polygon points="32,0 64,16 32,32 0,16" fill="#8ED95F" fill-opacity="0.5"/>
+  
+  <!-- Subtle texture -->
+  <g opacity="0.2">
+    <circle cx="16" cy="12" r="1" fill="#609A45"/>
+    <circle cx="48" cy="12" r="1" fill="#609A45"/>
+    <circle cx="32" cy="8" r="1" fill="#609A45"/>
+    <circle cx="22" cy="20" r="1" fill="#609A45"/>
+    <circle cx="42" cy="20" r="1" fill="#609A45"/>
+    <circle cx="32" cy="24" r="1" fill="#609A45"/>
+  </g>
+</svg>

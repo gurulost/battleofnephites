@@ -1,0 +1,35 @@
+<svg width="64" height="32" viewBox="0 0 64 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Isometric forest tile - base -->
+  <polygon points="32,0 64,16 32,32 0,16" fill="#5BAC38"/>
+  
+  <!-- Trees -->
+  <g transform="translate(32, 16) scale(0.7)">
+    <!-- Tree trunk -->
+    <rect x="-2" y="-2" width="4" height="10" fill="#8B5A2B"/>
+    
+    <!-- Tree foliage -->
+    <polygon points="0,-25 15,-10 10,0 -10,0 -15,-10" fill="#2E7D32"/>
+    <polygon points="0,-20 12,-5 8,2 -8,2 -12,-5" fill="#388E3C" />
+    <polygon points="0,-15 8,0 5,5 -5,5 -8,0" fill="#43A047"/>
+  </g>
+  
+  <g transform="translate(16, 8) scale(0.5)">
+    <!-- Tree trunk -->
+    <rect x="-2" y="-2" width="4" height="10" fill="#8B5A2B"/>
+    
+    <!-- Tree foliage -->
+    <polygon points="0,-25 15,-10 10,0 -10,0 -15,-10" fill="#2E7D32"/>
+    <polygon points="0,-20 12,-5 8,2 -8,2 -12,-5" fill="#388E3C" />
+    <polygon points="0,-15 8,0 5,5 -5,5 -8,0" fill="#43A047"/>
+  </g>
+  
+  <g transform="translate(48, 8) scale(0.5)">
+    <!-- Tree trunk -->
+    <rect x="-2" y="-2" width="4" height="10" fill="#8B5A2B"/>
+    
+    <!-- Tree foliage -->
+    <polygon points="0,-25 15,-10 10,0 -10,0 -15,-10" fill="#2E7D32"/>
+    <polygon points="0,-20 12,-5 8,2 -8,2 -12,-5" fill="#388E3C" />
+    <polygon points="0,-15 8,0 5,5 -5,5 -8,0" fill="#43A047"/>
+  </g>
+</svg>
