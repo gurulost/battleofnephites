@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
-import { SwordsIcon, Music, Music2, Volume2, VolumeX } from 'lucide-react';
+import { SwordsIcon, Music, Music2, Volume2, VolumeX, PlayIcon } from 'lucide-react';
 import { useGame } from '../lib/stores/useGame';
+import { GameSetupFlow } from './GameSetupFlow';
+import { useGameSetup } from '../lib/stores/useGameSetup';
 
 interface StartMenuProps {
   onStartGame: () => void;
@@ -16,11 +19,26 @@ export const StartMenu = ({ onStartGame }: StartMenuProps) => {
     playSound
   } = useGame();
   
+  const { setupPhase, resetSetup } = useGameSetup();
+  const [showSetup, setShowSetup] = useState(false);
+  
   // Function to handle start game with sound effect
   const handleStartGame = () => {
     playSound('select');
     onStartGame();
   };
+  
+  // Function to begin setup flow
+  const handleBeginSetup = () => {
+    playSound('select');
+    resetSetup(); // Reset any previous setup state
+    setShowSetup(true);
+  };
+  
+  // If showing setup flow, render that instead
+  if (showSetup) {
+    return <GameSetupFlow onStartGame={handleStartGame} />;
+  }
   
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-gradient-to-b from-slate-900 to-slate-700">
@@ -54,10 +72,12 @@ export const StartMenu = ({ onStartGame }: StartMenuProps) => {
                 {soundEffectsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
               </Button>
             </div>
-            <SwordsIcon className="h-12 w-12 text-primary" />
+            <div className="flex items-center justify-center">
+              <SwordsIcon className="h-14 w-14 text-primary" />
+            </div>
             <div className="w-16"></div> {/* Empty div for spacing */}
           </div>
-          <CardTitle className="text-3xl font-bold">Battles of the Covenant</CardTitle>
+          <CardTitle className="text-3xl font-bold mb-1">Battles of the Covenant</CardTitle>
           <CardDescription className="text-slate-300">
             A Book of Mormon-themed strategy game
           </CardDescription>
@@ -68,8 +88,8 @@ export const StartMenu = ({ onStartGame }: StartMenuProps) => {
             <div className="bg-slate-700 p-3 rounded">
               <h3 className="font-medium mb-1">Game Objective</h3>
               <p className="text-sm text-slate-300">
-                Lead your Nephite civilization to victory by defeating the Lamanites. 
-                Capture or destroy the enemy's starting city to win.
+                Lead your civilization to victory by developing technology, gathering resources,
+                training units, and defeating your enemies through strategic warfare.
               </p>
             </div>
             
@@ -93,11 +113,12 @@ export const StartMenu = ({ onStartGame }: StartMenuProps) => {
             </div>
             
             <Button 
-              onClick={handleStartGame}
-              className="w-full mt-2 bg-primary hover:bg-primary/90 text-white"
+              onClick={handleBeginSetup}
+              className="w-full mt-4 bg-primary hover:bg-primary/90 text-white"
               size="lg"
             >
-              Start Game
+              <PlayIcon className="mr-2 h-4 w-4" />
+              Play
             </Button>
           </div>
         </CardContent>

@@ -6,6 +6,7 @@ import { GameConfig } from './game/config';
 import { EventBridge } from './lib/events/EventBridge';
 import { useGameState } from './lib/stores/useGameState';
 import { useGame } from './lib/stores/useGame';
+import { useGameSetup } from './lib/stores/useGameSetup';
 
 function App() {
   const [gameStarted, setGameStarted] = useState(false);
@@ -13,6 +14,7 @@ function App() {
   const gameInstance = useRef<Phaser.Game | null>(null);
   const { gamePhase, startGame } = useGameState();
   const { start: startUIGame } = useGame();
+  const { setupPhase } = useGameSetup();
 
   // Initialize the Phaser game when component mounts
   useEffect(() => {
@@ -53,7 +55,7 @@ function App() {
         className="w-full h-full absolute top-0 left-0 z-0"
       />
 
-      {/* UI Layer: Either show Start Menu or Game UI based on game state */}
+      {/* UI Layer: Show appropriate UI based on game state */}
       <div className="relative z-10 w-full h-full pointer-events-none">
         {gamePhase === 'start' ? (
           <StartMenu onStartGame={handleStartGame} />
