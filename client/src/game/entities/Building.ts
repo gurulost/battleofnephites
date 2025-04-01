@@ -90,12 +90,12 @@ export default class Building extends Phaser.GameObjects.Container {
     // Set depth based on y-position for proper isometric sorting
     this.setDepth(1000 + this.gridY);
     
-    // Add to scene
-    scene.add.existing(this);
-    
-    // Make interactive
+    // Make building interactive
     this.setSize(this.sprite.width, this.sprite.height);
     this.setInteractive();
+    
+    // Add to scene
+    scene.add.existing(this);
     
     // If there's already something in production queue, show icon
     this.updateProductionIcon();

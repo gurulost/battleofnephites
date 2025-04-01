@@ -100,12 +100,12 @@ export default class Unit extends Phaser.GameObjects.Container {
     // Set depth based on y-position for proper isometric sorting
     this.setDepth(1000 + this.gridY);
     
-    // Add to scene
-    scene.add.existing(this);
-    
-    // Make interactive
+    // Make unit interactive
     this.setSize(this.sprite.width, this.sprite.height);
     this.setInteractive();
+    
+    // Add to scene
+    scene.add.existing(this);
   }
   
   updateHealthBar() {

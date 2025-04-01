@@ -335,8 +335,18 @@ export default class MainScene extends Phaser.Scene {
   }
   
   setupInputHandlers() {
-    // Handle tile clicks
+    // Handle tile and entity clicks
     this.input.on('gameobjectdown', (pointer: Phaser.Input.Pointer, gameObject: any) => {
+      console.log("Object clicked:", gameObject.type, gameObject);
+      
+      // Check if the clicked object is a unit or building
+      if (gameObject instanceof Unit || gameObject instanceof Building) {
+        console.log("Clicked on entity:", gameObject.type, gameObject.id);
+        this.selectEntity(gameObject);
+        return;
+      }
+      
+      // Otherwise handle tile clicks
       if (pointer.rightButtonDown()) {
         // Right click - context action for selected entity
         if (this.selectedEntity && this.selectedEntity instanceof Unit) {
