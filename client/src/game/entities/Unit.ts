@@ -148,7 +148,7 @@ export default class Unit extends Phaser.GameObjects.Container {
     }
   }
   
-  move(targetX: number, targetY: number, path: {x: number, y: number}[]) {
+  move(targetX: number, targetY: number, path: {x: number, y: number}[], onComplete?: () => void) {
     // Already moving, ignore
     if (this.isMoving) return;
     
@@ -164,15 +164,17 @@ export default class Unit extends Phaser.GameObjects.Container {
     
     // If there's a path, follow it
     if (this.currentPath.length > 0) {
-      this.followPath();
+      this.followPath(onComplete);
     } else {
       this.isMoving = false;
+      if (onComplete) onComplete();
     }
   }
   
-  followPath() {
+  followPath(onComplete?: () => void) {
     if (this.currentPath.length === 0) {
       this.isMoving = false;
+      if (onComplete) onComplete();
       return;
     }
     
@@ -180,6 +182,7 @@ export default class Unit extends Phaser.GameObjects.Container {
     const nextPoint = this.currentPath.shift();
     if (!nextPoint) {
       this.isMoving = false;
+      if (onComplete) onComplete();
       return;
     }
     
@@ -205,8 +208,14 @@ export default class Unit extends Phaser.GameObjects.Container {
       duration: 200,
       ease: 'Linear',
       onComplete: () => {
-        // Continue following the path
-        this.followPath();
+        // If this is the last step in the path
+        if (this.currentPath.length === 0) {
+          this.isMoving = false;
+          if (onComplete) onComplete();
+        } else {
+          // Continue following the path
+          this.followPath(onComplete);
+        }
       }
     });
   }
@@ -271,6 +280,24 @@ export default class Unit extends Phaser.GameObjects.Container {
       duration: 200,
       yoyo: true,
       repeat: 1
+    });
+    
+    // Show resource gathering graphic
+    const gatherIcon = this.scene.add.image(0, -40, 'gather-indicator');
+    gatherIcon.setScale(0.6);
+    gatherIcon.setTint(0xffff00);
+    this.add(gatherIcon);
+    
+    // Fade and scale up then remove the indicator
+    this.scene.tweens.add({
+      targets: gatherIcon,
+      alpha: 0,
+      scale: 1,
+      y: -60,
+      duration: 800,
+      onComplete: () => {
+        gatherIcon.destroy();
+      }
     });
   }
   

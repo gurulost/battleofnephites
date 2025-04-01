@@ -512,14 +512,15 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
-    // Check if the unit has moves left
-    if (unit.movesLeft <= 0) {
-      console.log("No moves left for this unit");
+    // Check if the unit has actions left
+    if (unit.actionsLeft <= 0) {
+      console.log("No actions left for this unit");
       return;
     }
     
     // Check what's at the target tile
     const entityAtTarget = this.getEntityAtTile(targetX, targetY);
+    const targetTile = this.tiles[targetY][targetX];
     
     if (entityAtTarget) {
       // If enemy entity, attack
@@ -527,13 +528,73 @@ export default class MainScene extends Phaser.Scene {
         this.attackEntity(unit, entityAtTarget);
       } 
       // If friendly entity, do nothing (or implement special actions later)
-    } else if (this.isValidMovementTile(targetX, targetY)) {
+    } else if (unit.type === 'worker' && this.canGatherFromTile(targetX, targetY)) {
+      // Worker gathering resources
+      if (this.isAdjacentTile(unit.gridX, unit.gridY, targetX, targetY)) {
+        // If worker is adjacent to the resource tile, gather immediately
+        this.gatherResource(unit, targetX, targetY);
+      } else if (unit.movesLeft > 0) {
+        // If not adjacent, try to move there first
+        this.moveUnitForAction(unit, targetX, targetY, () => {
+          this.gatherResource(unit, targetX, targetY);
+        });
+      }
+    } else if (this.isValidMovementTile(targetX, targetY) && unit.movesLeft > 0) {
       // Empty tile - check if we can move there
       this.moveUnit(unit, targetX, targetY);
     }
   }
   
-  moveUnit(unit: Unit, targetX: number, targetY: number) {
+  /**
+   * Checks if a tile has resources that can be gathered
+   */
+  canGatherFromTile(x: number, y: number): boolean {
+    if (!this.isValidTile(x, y)) return false;
+    
+    const tile = this.tiles[y][x];
+    const tileType = tile.getData('tileType');
+    
+    // Resource tiles are grass (food), forest (production), and hill (production)
+    return tileType === 'grass' || tileType === 'forest' || tileType === 'hill';
+  }
+  
+  /**
+   * Checks if two tiles are adjacent
+   */
+  isAdjacentTile(x1: number, y1: number, x2: number, y2: number): boolean {
+    const dx = Math.abs(x1 - x2);
+    const dy = Math.abs(y1 - y2);
+    return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+  }
+  
+  /**
+   * Moves a unit to a position and then performs an action
+   */
+  moveUnitForAction(unit: Unit, targetX: number, targetY: number, onComplete: () => void) {
+    // Find a path to an adjacent tile
+    const adjacentTiles = this.getAdjacentTiles(targetX, targetY);
+    let bestTile = null;
+    let shortestPath = null;
+    
+    for (const tile of adjacentTiles) {
+      if (this.isValidTile(tile.x, tile.y) && !this.getEntityAtTile(tile.x, tile.y)) {
+        const path = this.pathFinder.findPath(unit.gridX, unit.gridY, tile.x, tile.y, unit.movesLeft);
+        if (path && (shortestPath === null || path.length < shortestPath.length)) {
+          shortestPath = path;
+          bestTile = tile;
+        }
+      }
+    }
+    
+    if (bestTile && shortestPath) {
+      // Move to the adjacent tile, then gather
+      this.moveUnit(unit, bestTile.x, bestTile.y, () => {
+        onComplete();
+      });
+    }
+  }
+  
+  moveUnit(unit: Unit, targetX: number, targetY: number, onComplete?: () => void) {
     // Check if destination is within move range
     const path = this.pathFinder.findPath(unit.gridX, unit.gridY, targetX, targetY, unit.movesLeft);
     
@@ -549,7 +610,12 @@ export default class MainScene extends Phaser.Scene {
     this.pathFinder.setWalkableAt(unit.gridX, unit.gridY, true);
     
     // Move the unit
-    unit.move(targetX, targetY, path);
+    unit.move(targetX, targetY, path, () => {
+      // Callback when movement animation is complete
+      if (onComplete) {
+        onComplete();
+      }
+    });
     
     // Update walkability maps (unit now at new position)
     this.pathFinder.setWalkableAt(targetX, targetY, false);
@@ -922,9 +988,14 @@ export default class MainScene extends Phaser.Scene {
     return null;
   }
   
+  isValidTile(x: number, y: number): boolean {
+    // Check if within map bounds
+    return x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight;
+  }
+  
   isValidMovementTile(x: number, y: number): boolean {
     // Check if within map bounds
-    if (x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight) {
+    if (!this.isValidTile(x, y)) {
       return false;
     }
     
@@ -938,7 +1009,7 @@ export default class MainScene extends Phaser.Scene {
   
   isValidBuildingLocation(x: number, y: number): boolean {
     // Check if within map bounds
-    if (x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight) {
+    if (!this.isValidTile(x, y)) {
       return false;
     }
     
