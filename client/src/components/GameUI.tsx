@@ -8,6 +8,82 @@ import { useGameState } from '../lib/stores/useGameState';
 import { EventBridge } from '../lib/events/EventBridge';
 import { Button } from './ui/button';
 import { Building, Unit } from '../types/game';
+import { Card, CardContent } from './ui/card';
+import { Swords, Shield, Heart, Wifi } from 'lucide-react';
+
+// Combat prediction display component
+const CombatPredictor = ({ 
+  attacker, 
+  defender, 
+  terrainBonus = 0 
+}: { 
+  attacker: Unit; 
+  defender: Unit | Building; 
+  terrainBonus?: number;
+}) => {
+  // Calculate expected damage
+  const calculateDamage = () => {
+    const attackValue = attacker.attack;
+    const defenseValue = defender.defense + terrainBonus;
+    return Math.max(1, attackValue - defenseValue / 2);
+  };
+  
+  // Calculate health after attack
+  const calculateRemainingHealth = () => {
+    const damage = calculateDamage();
+    return Math.max(0, defender.health - damage);
+  };
+  
+  // Calculate if attack will defeat the defender
+  const willDefeat = () => {
+    return calculateRemainingHealth() <= 0;
+  };
+  
+  const expectedDamage = calculateDamage();
+  const remainingHealth = calculateRemainingHealth();
+  const defeatPrediction = willDefeat();
+  
+  return (
+    <Card className="mt-4 bg-slate-700 border-red-500 border">
+      <CardContent className="p-3">
+        <h3 className="text-white font-bold mb-2 flex items-center">
+          <Swords className="h-4 w-4 mr-1 text-red-500" />
+          Combat Prediction
+        </h3>
+        
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center">
+            <Swords className="h-4 w-4 mr-1 text-orange-400" /> 
+            <span className="text-white text-sm">Attack: {attacker.attack}</span>
+          </div>
+          
+          <div className="flex items-center">
+            <Shield className="h-4 w-4 mr-1 text-blue-400" /> 
+            <span className="text-white text-sm">Defense: {defender.defense} {terrainBonus > 0 ? `+${terrainBonus}` : ''}</span>
+          </div>
+        </div>
+        
+        <div className="mt-2 p-2 bg-slate-800 rounded-md">
+          <div className="text-white text-sm flex items-center mb-1">
+            <span className="text-red-500 font-bold mr-2">-{expectedDamage}</span>
+            <span>Expected damage</span>
+          </div>
+          
+          <div className="text-white text-sm flex items-center">
+            <Heart className="h-4 w-4 mr-1 text-red-400" />
+            <span>{remainingHealth} / {defender.health} HP remaining</span>
+          </div>
+          
+          {defeatPrediction && (
+            <div className="mt-2 text-red-500 text-sm font-bold">
+              Will defeat enemy!
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export const GameUI = () => {
   const { 
@@ -15,12 +91,16 @@ export const GameUI = () => {
     currentPlayer, 
     selectedEntity,
     gamePhase,
-    endTurn 
+    endTurn,
+    players
   } = useGameState();
   
   const [showBuildMenu, setShowBuildMenu] = useState(false);
   const [showTrainMenu, setShowTrainMenu] = useState(false);
   const [gameOverMessage, setGameOverMessage] = useState('');
+  const [combatTarget, setCombatTarget] = useState<Unit | Building | null>(null);
+  const [terrainBonus, setTerrainBonus] = useState<number>(0);
+  const [attackingUnit, setAttackingUnit] = useState<Unit | null>(null);
   
   // Handle build button click
   const handleBuildClick = () => {
@@ -41,15 +121,71 @@ export const GameUI = () => {
     endTurn();
   };
   
-  // Listen for game over events
+  // Listen for game events
   useEffect(() => {
-    const removeListener = EventBridge.on('phaser:gameOver', (data: any) => {
+    // Handle game over events
+    const gameOverListener = EventBridge.on('phaser:gameOver', (data: any) => {
       const isPlayerVictory = data.victorId === 'player1';
       setGameOverMessage(isPlayerVictory ? 'Victory! You have conquered your enemies!' : 'Defeat! Your city has fallen!');
     });
     
-    return () => removeListener();
-  }, []);
+    // Handle potential combat target detection
+    const potentialCombatListener = EventBridge.on('phaser:potentialCombat', (data: any) => {
+      const { attackerId, defenderId, terrainDefenseBonus } = data;
+      
+      // Find attacker and defender entities
+      let attacker: Unit | null = null;
+      let defender: Unit | Building | null = null;
+      
+      // Search among all players' units and buildings
+      for (const player of players) {
+        // Look for attacker in units
+        const foundAttacker = player.units.find(unit => unit.id === attackerId);
+        if (foundAttacker) attacker = foundAttacker;
+        
+        // Look for defender in units
+        const foundDefenderUnit = player.units.find(unit => unit.id === defenderId);
+        if (foundDefenderUnit) defender = foundDefenderUnit;
+        
+        // Look for defender in buildings
+        const foundDefenderBuilding = player.buildings.find(building => building.id === defenderId);
+        if (foundDefenderBuilding) defender = foundDefenderBuilding;
+      }
+      
+      if (attacker && defender) {
+        setAttackingUnit(attacker);
+        setCombatTarget(defender);
+        setTerrainBonus(terrainDefenseBonus || 0);
+      } else {
+        setAttackingUnit(null);
+        setCombatTarget(null);
+      }
+    });
+    
+    // Clear combat prediction when selection changes or attack completes
+    const clearCombatListener = EventBridge.on('phaser:entitySelected', () => {
+      setCombatTarget(null);
+      setAttackingUnit(null);
+    });
+    
+    const attackCompletedListener = EventBridge.on('phaser:attackPerformed', () => {
+      setCombatTarget(null);
+      setAttackingUnit(null);
+    });
+    
+    const clearPredictionListener = EventBridge.on('phaser:clearCombatPrediction', () => {
+      setCombatTarget(null);
+      setAttackingUnit(null);
+    });
+    
+    return () => {
+      gameOverListener();
+      potentialCombatListener();
+      clearCombatListener();
+      attackCompletedListener();
+      clearPredictionListener();
+    };
+  }, [players]);
   
   // Don't render UI during start phase
   if (gamePhase === 'start') {
@@ -113,6 +249,15 @@ export const GameUI = () => {
           <div className="text-white text-center mt-8">
             <p>Select a unit or building</p>
           </div>
+        )}
+        
+        {/* Combat prediction when hovering enemy */}
+        {attackingUnit && combatTarget && (
+          <CombatPredictor 
+            attacker={attackingUnit} 
+            defender={combatTarget}
+            terrainBonus={terrainBonus}
+          />
         )}
         
         {/* Build menu */}

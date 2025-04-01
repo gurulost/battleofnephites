@@ -235,7 +235,7 @@ export default class Unit extends Phaser.GameObjects.Container {
   }
   
   playAttackAnimation(targetX: number, targetY: number) {
-    // Simple attack animation - move toward target then back
+    // Attack animation with multiple visual effects
     const startX = this.x;
     const startY = this.y;
     
@@ -261,14 +261,134 @@ export default class Unit extends Phaser.GameObjects.Container {
     const moveX = dx / distance * 20;
     const moveY = dy / distance * 20;
     
-    // Tween forward then back
+    // Show attack icon
+    const attackIcon = this.scene.add.image(0, -40, 'attack-indicator');
+    attackIcon.setScale(0.6);
+    attackIcon.setTint(0xff0000);
+    this.add(attackIcon);
+    
+    // Fade and scale up then remove the indicator
+    this.scene.tweens.add({
+      targets: attackIcon,
+      alpha: 0,
+      scale: 1,
+      y: -60,
+      duration: 800,
+      onComplete: () => {
+        attackIcon.destroy();
+      }
+    });
+    
+    // Flash the unit sprite to indicate attack
+    this.scene.tweens.add({
+      targets: this.sprite,
+      alpha: 0.7,
+      duration: 50,
+      yoyo: true,
+      repeat: 1
+    });
+    
+    // Tween forward then back (lunge attack)
     this.scene.tweens.add({
       targets: this,
       x: startX + moveX,
       y: startY + moveY,
       duration: 100,
       yoyo: true,
-      repeat: 1
+      repeat: 1,
+      onComplete: () => {
+        // After attacking, add slash effect at target position
+        if (this.type !== 'ranged') {
+          // For melee units, add slash effect
+          this.createMeleeImpactEffect(targetScreenX, targetScreenY);
+        } else {
+          // For ranged units, add projectile effect
+          this.createRangedAttackEffect(startX, startY, targetScreenX, targetScreenY);
+        }
+      }
+    });
+  }
+  
+  createMeleeImpactEffect(targetX: number, targetY: number) {
+    // Create slash effect at target position
+    const slash = this.scene.add.graphics();
+    slash.x = targetX - this.x;
+    slash.y = targetY - this.y - 30;
+    this.add(slash);
+    
+    // Draw slash
+    slash.lineStyle(3, 0xff0000, 1);
+    slash.beginPath();
+    slash.moveTo(-10, -10);
+    slash.lineTo(10, 10);
+    slash.moveTo(10, -10);
+    slash.lineTo(-10, 10);
+    slash.closePath();
+    slash.strokePath();
+    
+    // Fade out and destroy
+    this.scene.tweens.add({
+      targets: slash,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => {
+        slash.destroy();
+      }
+    });
+  }
+  
+  createRangedAttackEffect(startX: number, startY: number, targetX: number, targetY: number) {
+    // Create projectile
+    const projectile = this.scene.add.graphics();
+    projectile.x = 0;
+    projectile.y = -20;
+    this.add(projectile);
+    
+    // Draw projectile
+    projectile.fillStyle(0xff0000, 1);
+    projectile.fillCircle(0, 0, 5);
+    
+    // Calculate direction vector
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Normalize
+    const ndx = dx / distance;
+    const ndy = dy / distance;
+    
+    // Create position for projectile to move to (relative to unit)
+    const targetLocalX = ndx * 50;
+    const targetLocalY = ndy * 50 - 20; // -20 to account for projectile's y offset
+    
+    // Animate projectile
+    this.scene.tweens.add({
+      targets: projectile,
+      x: targetLocalX,
+      y: targetLocalY,
+      duration: 200,
+      onComplete: () => {
+        // Create impact effect at end position
+        const impact = this.scene.add.graphics();
+        impact.x = targetX - this.x;
+        impact.y = targetY - this.y - 30;
+        this.add(impact);
+        
+        // Draw impact
+        impact.fillStyle(0xff0000, 0.7);
+        impact.fillCircle(0, 0, 10);
+        
+        // Fade out and destroy
+        this.scene.tweens.add({
+          targets: [projectile, impact],
+          alpha: 0,
+          duration: 200,
+          onComplete: () => {
+            projectile.destroy();
+            impact.destroy();
+          }
+        });
+      }
     });
   }
   

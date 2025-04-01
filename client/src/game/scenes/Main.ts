@@ -35,6 +35,12 @@ export default class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene');
   }
+  
+  preload() {
+    // Load the attack and gather indicators
+    this.load.svg('attack-indicator', 'assets/attack-indicator.svg');
+    this.load.svg('gather-indicator', 'assets/gather-indicator.svg');
+  }
 
   create() {
     console.log('Main scene started');
@@ -342,7 +348,31 @@ export default class MainScene extends Phaser.Scene {
       // Check if the clicked object is a unit or building
       if (gameObject instanceof Unit || gameObject instanceof Building) {
         console.log("Clicked on entity:", gameObject.type, gameObject.id);
-        this.selectEntity(gameObject);
+        
+        // If we have a unit selected and click on an enemy, attack it
+        if (this.selectedEntity instanceof Unit && 
+            this.selectedEntity.playerId === this.getCurrentPlayer().id &&
+            gameObject.playerId !== this.getCurrentPlayer().id &&
+            this.isCurrentPlayerTurn() &&
+            this.selectedEntity.actionsLeft > 0) {
+          
+          // Check if in attack range
+          const dx = Math.abs(this.selectedEntity.gridX - gameObject.gridX);
+          const dy = Math.abs(this.selectedEntity.gridY - gameObject.gridY);
+          const distance = dx + dy;
+          const attackRange = this.selectedEntity.type === 'ranged' ? 2 : 1;
+          
+          if (distance <= attackRange) {
+            // Attack the enemy
+            this.attackEntity(this.selectedEntity, gameObject);
+            return;
+          }
+        }
+        
+        // Otherwise just select the entity (if it's yours)
+        if (gameObject.playerId === this.getCurrentPlayer().id || !this.isCurrentPlayerTurn()) {
+          this.selectEntity(gameObject);
+        }
         return;
       }
       
@@ -366,7 +396,26 @@ export default class MainScene extends Phaser.Scene {
           const entityAtTile = this.getEntityAtTile(gridX, gridY);
           
           if (entityAtTile) {
-            // Select the entity
+            // If it's an enemy and we have a unit selected that can attack, attack it
+            if (entityAtTile.playerId !== this.getCurrentPlayer().id && 
+                this.selectedEntity instanceof Unit &&
+                this.selectedEntity.playerId === this.getCurrentPlayer().id &&
+                this.isCurrentPlayerTurn() &&
+                this.selectedEntity.actionsLeft > 0) {
+              
+              // Check if in attack range
+              const dx = Math.abs(this.selectedEntity.gridX - entityAtTile.gridX);
+              const dy = Math.abs(this.selectedEntity.gridY - entityAtTile.gridY);
+              const distance = dx + dy;
+              const attackRange = this.selectedEntity.type === 'ranged' ? 2 : 1;
+              
+              if (distance <= attackRange) {
+                // Attack the enemy
+                this.attackEntity(this.selectedEntity, entityAtTile);
+                return;
+              }
+            }
+            // Otherwise select the entity
             this.selectEntity(entityAtTile);
           } else {
             // If no entity at tile and we have a selected unit, try to move there
@@ -378,6 +427,55 @@ export default class MainScene extends Phaser.Scene {
             }
           }
         }
+      }
+    });
+    
+    // Handle pointer over events to show combat prediction
+    this.input.on('gameobjectover', (pointer: Phaser.Input.Pointer, gameObject: any) => {
+      // Only show predictions when we have a unit selected that can attack
+      if (this.selectedEntity instanceof Unit && 
+          this.selectedEntity.playerId === this.getCurrentPlayer().id &&
+          this.isCurrentPlayerTurn() &&
+          this.selectedEntity.actionsLeft > 0) {
+        
+        // Check if we're hovering over an enemy unit or building
+        if ((gameObject instanceof Unit || gameObject instanceof Building) && 
+             gameObject.playerId !== this.getCurrentPlayer().id) {
+          
+          // Check if the enemy is in attack range
+          const dx = Math.abs(this.selectedEntity.gridX - gameObject.gridX);
+          const dy = Math.abs(this.selectedEntity.gridY - gameObject.gridY);
+          const distance = dx + dy;
+          const attackRange = this.selectedEntity.type === 'ranged' ? 2 : 1;
+          
+          if (distance <= attackRange) {
+            // Get terrain defense bonus
+            const defenderTile = this.tiles[gameObject.gridY][gameObject.gridX];
+            const terrainType = defenderTile.getData('tileType');
+            
+            let terrainDefenseBonus = 0;
+            if (terrainType === 'forest') {
+              terrainDefenseBonus = 1;
+            } else if (terrainType === 'hill') {
+              terrainDefenseBonus = 2;
+            }
+            
+            // Emit prediction event with attacker and defender info
+            EventBridge.emit('phaser:potentialCombat', {
+              attackerId: this.selectedEntity.id,
+              defenderId: gameObject.id,
+              terrainDefenseBonus
+            });
+          }
+        }
+      }
+    });
+    
+    // Handle pointer out events to clear combat prediction
+    this.input.on('gameobjectout', (pointer: Phaser.Input.Pointer, gameObject: any) => {
+      if ((gameObject instanceof Unit || gameObject instanceof Building)) {
+        // Clear the combat prediction
+        EventBridge.emit('phaser:clearCombatPrediction', {});
       }
     });
   }
@@ -660,15 +758,33 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
+    // Get terrain at defender's location
+    const defenderTile = this.tiles[defender.gridY][defender.gridX];
+    const terrainType = defenderTile.getData('tileType');
+    
+    // Calculate terrain defense bonus
+    let terrainDefenseBonus = 0;
+    if (terrainType === 'forest') {
+      terrainDefenseBonus = 1; // Forest gives +1 defense
+    } else if (terrainType === 'hill') {
+      terrainDefenseBonus = 2; // Hills give +2 defense
+    }
+    
     // Calculate attack damage based on attacker's attack vs defender's defense
     const baseDamage = attacker.attack;
-    const mitigatedDamage = Math.max(1, baseDamage - defender.defense / 2);
+    const totalDefense = defender.defense + terrainDefenseBonus;
+    
+    // Damage is reduced by half of defense value (minimum 1 damage)
+    const mitigatedDamage = Math.max(1, baseDamage - totalDefense / 2);
     
     // Apply damage to the defender
     defender.takeDamage(mitigatedDamage);
     
     // Show attack animation
     attacker.playAttackAnimation(defender.gridX, defender.gridY);
+    
+    // Create floating damage text
+    this.showDamageText(defender.gridX, defender.gridY, mitigatedDamage);
     
     // Use up the attacker's action
     attacker.actionsLeft = 0;
@@ -686,7 +802,49 @@ export default class MainScene extends Phaser.Scene {
       attackerId: attacker.id,
       defenderId: defender.id,
       damage: mitigatedDamage,
+      terrainBonus: terrainDefenseBonus,
       defenderRemaining: defender.health
+    });
+  }
+  
+  /**
+   * Show floating damage text at the specified grid position
+   */
+  showDamageText(gridX: number, gridY: number, damage: number) {
+    // Convert grid position to screen coordinates
+    const { screenX, screenY } = GridUtils.cartesianToIsometric(
+      gridX, gridY, 64, 32
+    );
+    
+    // The container position is in the center of the map
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 3;
+    const mapWidth = 15 * 32; // Half tile width for offset * map width
+    const mapHeight = 15 * 16; // Half tile height for offset * map height
+    
+    const x = centerX + screenX - mapWidth / 2;
+    const y = centerY + screenY - mapHeight / 2;
+    
+    // Create the damage text
+    const damageText = this.add.text(x, y - 50, `-${damage}`, {
+      fontFamily: 'Arial',
+      fontSize: '24px',
+      color: '#ff0000',
+      stroke: '#000000',
+      strokeThickness: 4,
+      align: 'center'
+    });
+    damageText.setOrigin(0.5, 0.5);
+    
+    // Animate the text
+    this.tweens.add({
+      targets: damageText,
+      y: y - 80,
+      alpha: 0,
+      duration: 1000,
+      onComplete: () => {
+        damageText.destroy();
+      }
     });
   }
   
