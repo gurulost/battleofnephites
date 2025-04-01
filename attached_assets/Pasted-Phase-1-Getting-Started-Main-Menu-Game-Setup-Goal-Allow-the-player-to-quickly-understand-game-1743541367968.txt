@@ -1,0 +1,122 @@
+Phase 1: Getting Started (Main Menu & Game Setup)
+
+Goal: Allow the player to quickly understand game modes and start their first turn-based game.
+1. Game Mode Selection:
+UI: "GAME MODE" screen.
+Options:
+"Perfection": Turn-limited (30 turns) score attack. (Lower priority).
+"Domination": Turn-based elimination mode, no turn limit. Recommended for beginners.
+Player Action: Tap/Click "Domination".
+2. Tribe (Faction) Selection:
+UI: "PICK YOUR TRIBE" screen. Grid of faction icons.
+Availability: Initially Nephites, Lamanites, etc. Others locked.
+Guidance: Each faction has unique starting tech/bonus and turn-based playstyle.
+Player Action: Tap/Click a faction icon.
+3. Faction Details & Confirmation:
+UI: Pop-up with faction preview, name, description, starting bonus.
+Buttons: "CANCEL", "PICK".
+Player Action: Tap/Click "PICK".
+4. Game Setup:
+UI: "GAME SETUP" screen.
+Options:
+"Opponents": Select number (1-5). Map size adjusts accordingly.
+"Difficulty": Select "Easy", "Normal", "Hard", "Crazy". Default "Easy".
+Button: "START GAME".
+Guidance: Explain opponent count/map size, recommend "Easy".
+Player Action: Tap/Click "START GAME".
+5. Loading Screen:
+UI: "Creating World..." with indicator.
+Phase 2: First Turns - Core Gameplay Loop (Turn-Based Domination)
+
+Goal: Introduce map, units, city growth, movement, resource actions, tech tree, and the concept of turns and actions per turn.
+1. Game Start & Initial View (Turn 1):
+Map: Isometric map appears, centered on the starting City and Unit. Fog of War active.
+Initial Entities: City (Level 1, shows production/pop info), Starting Unit (Warrior, shows health/action status).
+Welcome Pop-up: Title, welcome message, objective (Domination: Eliminate rivals). Button: "OK".
+Player Action: Tap/Click "OK".
+2. HUD Introduction & Basic Unit Action (Turn 1):
+UI (HUD): Introduce HUD elements (highlights/tooltips):
+Top Left: Score.
+Top Center: Stars (⭐ Currency) & Income (+X ⭐). Turn Counter (starts at 1).
+Bottom Left: Menu, Stats, Tech Tree.
+Bottom Right: Next Turn button (crucial for turn-based flow).
+First Action - Movement/Exploration:
+Guidance: "Select your Warrior. Units typically have one action per turn (like moving or attacking)."
+Player Action: Tap/Click Warrior.
+UI Feedback: Highlight unit. Show movement range (blue tiles). Context panel: "[Unit Name] - Can Move or Attack this turn. Click blue tile to move."
+Player Action: Tap/Click a blue tile into Fog of War.
+Feedback: Unit animates movement. Fog revealed. Movement highlights disappear. Crucially, indicate the unit has used its action for the turn (e.g., grey out unit slightly, remove action indicator).
+Guidance: "Good! Exploration reveals the map. This unit has now used its action for Turn 1."
+3. City Growth & Resource Interaction (Turn 1 / 2):
+Guidance: "Grow your city by gaining Population. Harvest resources inside city borders (marked line) using Stars (⭐)."
+(Adapt Example): "As Bardur, tap an animal within borders." (If another unit like a Worker is used for resource actions, guide the player to select that unit first). Clarify if resource harvesting uses a unit's action. Assume for now it's an instant action costing Stars if done via city UI, or uses a Worker's turn action if done via Worker unit. Let's assume clicking tile uses Stars, no unit action initially.
+Player Action: Tap resource tile within borders.
+UI Feedback: Pop-up: Resource type, Action ("Hunting", "Clear Forest"), Star Cost (⭐ X), Description ("+1 Population"), Button ("DO IT").
+Player Action: Tap/Click "DO IT".
+Feedback: Stars decrease. Score increases. Resource removed/changed. City Population bar fills. Visual/Audio feedback.
+Guidance: "Harvest more resources when you have Stars to level up your city."
+(Repeat until Level Up)
+City Level Up:
+Feedback: City visually grows. Sound effect. Pop-up: "[City Name] leveled up to Level X!".
+Reward Choice: Pop-up with reward options (Workshop, Explorer, Resources, City Wall). Clear icons/text.
+Player Action: Tap/Click reward.
+Feedback: Reward applied. Income updates/+Stars added/Wall appears.
+Guidance (Task): Optional "New Task!" pop-up.
+4. Ending the Turn (Turn 1):
+Guidance: "All actions completed for this turn? Click 'Next Turn' to let opponents play and refresh your units."
+Player Action: Tap/Click "Next Turn".
+UI Feedback: Confirmation pop-up ("End Turn 1?"). "CANCEL", "OK".
+Player Action: Tap/Click "OK".
+Feedback: Screen might briefly indicate "Opponent's Turn". Turn counter increments to 2. Stars update. Units become active again.
+5. Technology Introduction (Turn 2 / 3):
+Guidance: "Use Stars (⭐) to research technology. Tap the Tech Tree button."
+Player Action: Tap Tech Tree button.
+UI (Tech Tree): Show tech diagram. Indicate unlocked, available (with cost), and locked techs. Note cost increase per city.
+Guidance: "Select an available tech to see details."
+Player Action: Tap an available tech icon.
+UI Feedback: Pop-up: Name, Cost, Description, Enables, "RESEARCH" button.
+Guidance: "Click 'RESEARCH' to learn it."
+Player Action: Tap "RESEARCH".
+Feedback: Stars decrease. Score increases. Sound/visual effect. "New Tech!" pop-up. Tech Tree updates.
+Player Action: Close Tech Tree.
+6. Using New Tech / Unit Production (Turn 2 / 3 / 4):
+Guidance (If Forestry/Org): "You can now use [New Action] on [Resource Type] tiles within city borders using Stars."
+Player Action & Feedback: (As in step 3, clicking tile and action button).
+Guidance (Unit Production): "Let's train a unit. Select your City."
+Player Action: Tap City.
+UI Feedback: City context panel: "Choose unit to produce". Show available units (Warrior) with Star cost.
+Player Action: Tap "Warrior" icon.
+Feedback: Stars decrease. Score increases. New Warrior appears adjacent. Sound effect. Crucially, this new unit cannot act until the NEXT turn. Indicate this visually (greyed out).
+Guidance: "Units produced this turn can act starting next turn. Cities support a limited number of units."
+7. Capturing Villages (Turn 3 / 4+):
+Guidance: "You found a village! Move a unit onto it. It takes one turn to secure it."
+Player Action: Select Unit, move onto village tile.
+Feedback: Pop-up: "Entering Village! Ready to capture next turn." Unit uses its action for the turn.
+(Next Turn)
+Guidance: "Select the unit on the village and click the capture icon. This uses the unit's action for this turn."
+Player Action: Tap Unit. Tap Capture icon over village.
+Feedback: Capture effect. Village converts. Pop-up: "Village Converted!". Score increases. Tech costs increase notification. Unit cannot act further this turn.
+Guidance: "Capturing increases income and empire size, but makes tech cost more!"
+8. Encountering Enemies & Combat (Later Turns):
+(When enemy revealed)
+Feedback: Discovery sound. Enemy appears. Stats/Hostility indicator shown.
+Guidance: "Enemy sighted! Select your unit to attack."
+Player Action: Select player unit.
+UI Feedback: Available attack range shown (red highlight?). Red target icons appear over enemies in range. Context panel: "[Unit Name] - Can Attack this turn. Click red target."
+Guidance: "Click the red target icon to attack. This uses the unit's action for the turn."
+Player Action: Tap red icon over enemy.
+Feedback: Combat animation. Damage numbers. Combat sounds. Attacking unit is marked as having acted. Enemy might retaliate immediately if it's their turn or if combat is resolved instantly within a turn. (Clarify combat resolution: simultaneous or attacker first?). Assume attacker first for simplicity.
+Guidance: "Well done! Keep an eye on unit health."
+Core Actions Summary (Turn-Based Focus):
+
+Unit Action: Most units can perform ONE major action per turn: Move OR Attack OR Use Ability OR Capture Village.
+City Actions: Harvesting resources via city UI (if implemented this way) might be instant and cost Stars, not tying up a unit. Training units in a city starts production but doesn't use a unit's action.
+Tech Research: Costs Stars, potentially takes 1 turn to complete (or instant?). Does not use a unit action.
+End Turn: Progresses the game, allows opponents to act, refreshes player units' actions, grants Star income.
+Developer Notes:
+
+Turn Structure: Clearly define what constitutes a "turn" and what actions consume a unit's ability to act within that turn.
+Visual State: Units need clear visual indicators for: Selected, Has Acted This Turn, Newly Produced (Cannot Act).
+Combat Resolution: Decide if combat is resolved instantly when an attack is declared, or if attacks are queued and resolved at the end of the turn or start of the next. Instant resolution is simpler.
+Action Economy: Balance the cost (Stars, Unit Action) of different options (moving, attacking, harvesting, building, researching).
+Feedback: Maintain strong visual/audio feedback for turn progression, actions taken, action points used/refreshed, and resource/score changes.

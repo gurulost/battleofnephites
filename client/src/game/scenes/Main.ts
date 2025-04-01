@@ -43,29 +43,29 @@ export default class MainScene extends Phaser.Scene {
   
   preload() {
     // Load the tile assets
-    this.load.svg('grass', 'assets/grass.svg');
-    this.load.svg('forest', 'assets/forest.svg');
-    this.load.svg('hill', 'assets/hill.svg');
+    this.load.svg('grass', 'src/assets/tiles/grass.svg');
+    this.load.svg('forest', 'src/assets/tiles/forest.svg');
+    this.load.svg('hill', 'src/assets/tiles/hill.svg');
     
     // Load the action indicators
-    this.load.svg('attack-indicator', 'assets/attack-indicator.svg');
-    this.load.svg('gather-indicator', 'assets/gather-indicator.svg');
+    this.load.svg('attack-indicator', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/target.svg');
+    this.load.svg('gather-indicator', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/tool.svg');
     
-    // Load Nephite unit assets
-    this.load.svg('nephite-worker', 'assets/nephite-worker.svg');
-    this.load.svg('nephite-melee', 'assets/nephite-melee.svg');
-    this.load.svg('nephite-ranged', 'assets/nephite-ranged.svg');
+    // Load unit assets - using generic versions for both factions for now
+    this.load.svg('nephite-worker', 'src/assets/units/worker.svg');
+    this.load.svg('nephite-melee', 'src/assets/units/melee.svg');
+    this.load.svg('nephite-ranged', 'src/assets/units/ranged.svg');
     
-    // Load Lamanite unit assets
-    this.load.svg('lamanite-worker', 'assets/lamanite-worker.svg');
-    this.load.svg('lamanite-melee', 'assets/lamanite-melee.svg');
-    this.load.svg('lamanite-ranged', 'assets/lamanite-ranged.svg');
+    // Using the same assets for both factions temporarily
+    this.load.svg('lamanite-worker', 'src/assets/units/worker.svg');
+    this.load.svg('lamanite-melee', 'src/assets/units/melee.svg');
+    this.load.svg('lamanite-ranged', 'src/assets/units/ranged.svg');
     
-    // Load building assets
-    this.load.svg('nephite-city', 'assets/nephite-city.svg');
-    this.load.svg('nephite-barracks', 'assets/nephite-barracks.svg');
-    this.load.svg('lamanite-city', 'assets/lamanite-city.svg');
-    this.load.svg('lamanite-barracks', 'assets/lamanite-barracks.svg');
+    // Load building assets - using generic versions for both factions for now
+    this.load.svg('nephite-city', 'src/assets/buildings/city.svg');
+    this.load.svg('nephite-barracks', 'src/assets/buildings/barracks.svg');
+    this.load.svg('lamanite-city', 'src/assets/buildings/city.svg');
+    this.load.svg('lamanite-barracks', 'src/assets/buildings/barracks.svg');
   }
 
   create() {

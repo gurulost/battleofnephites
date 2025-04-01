@@ -63,9 +63,10 @@ export default class Building extends Phaser.GameObjects.Container {
     // Initialize production queue if provided
     this.productionQueue = config.productionQueue || [];
     
-    // Create sprite based on building type and faction
-    const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
-    this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
+    // Create sprite based on building type (for now using generic sprites regardless of faction)
+    // const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
+    // this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
+    this.sprite = scene.add.image(0, 0, type);
     
     // Set origin to bottom-center for isometric positioning
     this.sprite.setOrigin(0.5, 1);
@@ -205,10 +206,10 @@ export default class Building extends Phaser.GameObjects.Container {
     
     // If there's something in the queue, show production icon
     if (this.productionQueue.length > 0) {
-      // Show the unit type that's being produced with the correct faction
-      const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
+      // Show the unit type that's being produced (using generic sprites for now)
+      // const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
       const unitType = this.productionQueue[0];
-      this.productionIcon = this.scene.add.image(15, -35, `${faction}-${unitType}`);
+      this.productionIcon = this.scene.add.image(15, -35, unitType);
       this.productionIcon.setScale(0.5);
       this.add(this.productionIcon);
     }

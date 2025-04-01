@@ -73,9 +73,10 @@ export default class Unit extends Phaser.GameObjects.Container {
     this.movesLeft = this.speed;
     this.actionsLeft = 1;
     
-    // Create sprite based on unit type and faction
-    const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
-    this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
+    // Create sprite based on unit type (for now using generic sprites regardless of faction)
+    // const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
+    // this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
+    this.sprite = scene.add.image(0, 0, type);
     
     // Set origin to bottom-center for isometric positioning
     this.sprite.setOrigin(0.5, 1);
