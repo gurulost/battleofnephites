@@ -1,0 +1,38 @@
+Top Factions for a Book of Mormon Strategy Game
+1. Nephites
+Gameplay Identity: Technologically advanced defenders
+* Strengths: Heavy armor, city fortifications, scriptures provide research/tech boosts, skilled in record-keeping, tactics
+* Weaknesses: Vulnerable to pride and internal dissent (e.g., kingmen)
+* Unique Units: Stripling Warriors (if righteous), Chief Judge
+* Special Ability: “Title of Liberty” morale buff when faith is high
+* Victory Type: Defensive / Cultural / Religious
+
+2. Lamanites
+Gameplay Identity: Aggressive expansionists
+* Strengths: High mobility, early-game power, strength in melee
+* Weaknesses: Susceptible to ideological conversion, inconsistent unity
+* Unique Units: Berserker class, Converted Warrior
+* Special Ability: “Blood Feud” — damage boost against Nephites
+* Victory Type: Domination / Cultural Conversion
+
+
+8. Mulekites of Zarahemla
+Gameplay Identity: Cultural chameleons and diplomatic power brokers
+Strengths: Fast population growth, adaptable ideology, diplomatic influence, bonuses in multicultural cities Weaknesses: Start without scripture/faith infrastructure, vulnerable to early cultural domination Unique Units: Royal Envoy, Zarahemla Guard, Memory Seeker Special Ability: “Cultural Reclamation” — gain permanent buffs by recovering knowledge from other factions (e.g., captured prophets, scriptures, or cultural sites) Victory Type: Diplomatic / Cultural / Historical Recovery
+
+
+6. Anti-Nephi-Lehies / Ammonites
+Gameplay Identity: Pacifist faith-builders and support faction
+* Strengths: Cultural influence, missionary conversion, inspire other factions
+* Weaknesses: Cannot initiate combat, vulnerable early on
+* Unique Units: Missionary, Stripling Youth (only defensive)
+* Special Ability: “Covenant of Peace” — converts enemy units if morale breaks
+* Victory Type: Faith / Cultural Conversion
+
+7. Jaredites (Advanced Mode or Expansion Faction)
+Gameplay Identity: Ancient imperial might
+* Strengths: Giant units (Coriantumr), long-standing institutions, large-scale warfare
+* Weaknesses: Plagued by endless civil war and pride
+* Unique Units: War Elephant, Etherian Prophet
+* Special Ability: “Prophetic Collapse” — total destruction event if pride > 80%
+* Victory Type: Military / Tragic Heroic Collapse (alternate scoring)

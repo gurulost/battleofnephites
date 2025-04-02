@@ -53,7 +53,7 @@ export interface Player {
   startingCityId: string;
 }
 
-export type Faction = 'nephites' | 'lamanites';
+export type Faction = 'nephites' | 'lamanites' | 'mulekites' | 'anti-nephi-lehies' | 'jaredites';
 
 export interface Map {
   width: number;
