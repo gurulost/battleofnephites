@@ -1,25 +1,29 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
-import { SwordsIcon, Music, Music2, Volume2, VolumeX, PlayIcon } from 'lucide-react';
+import { SwordsIcon, Music, Music2, Volume2, VolumeX, PlayIcon, Settings } from 'lucide-react';
 import { useGame } from '../lib/stores/useGame';
 import { GameSetupFlow } from './GameSetupFlow';
 import { useGameSetup } from '../lib/stores/useGameSetup';
+import { useAudio } from '../lib/stores/useAudio';
+import { AudioSettings } from './AudioSettings';
+import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 
 interface StartMenuProps {
   onStartGame: () => void;
 }
 
 export const StartMenu = ({ onStartGame }: StartMenuProps) => {
+  // Use our new audio state
   const {
-    musicPlaying,
-    soundEffectsEnabled,
+    soundEnabled,
+    musicEnabled,
+    toggleSound,
     toggleMusic,
-    toggleSoundEffects,
     playSound
-  } = useGame();
+  } = useAudio();
   
-  const { setupPhase, resetSetup } = useGameSetup();
+  const { resetSetup } = useGameSetup();
   const [showSetup, setShowSetup] = useState(false);
   
   // Function to handle start game with sound effect
@@ -50,27 +54,50 @@ export const StartMenu = ({ onStartGame }: StartMenuProps) => {
                 size="icon"
                 variant="outline" 
                 onClick={() => {
+                  if (soundEnabled) {
+                    playSound('select');
+                  }
                   toggleMusic(); 
-                  playSound('select');
                 }}
                 className="h-8 w-8 rounded-full"
               >
-                {musicPlaying ? <Music className="h-4 w-4" /> : <Music2 className="h-4 w-4 text-muted-foreground" />}
+                {musicEnabled ? <Music className="h-4 w-4" /> : <Music2 className="h-4 w-4 text-muted-foreground" />}
               </Button>
               <Button 
                 size="icon"
                 variant="outline" 
                 onClick={() => {
                   // Play sound before toggling if sound is enabled
-                  if (soundEffectsEnabled) {
+                  if (soundEnabled) {
                     playSound('select');
                   }
-                  toggleSoundEffects();
+                  toggleSound();
                 }}
                 className="h-8 w-8 rounded-full"
               >
-                {soundEffectsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
               </Button>
+              
+              {/* Add settings dialog for audio */}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    size="icon"
+                    variant="outline" 
+                    onClick={() => {
+                      if (soundEnabled) {
+                        playSound('select');
+                      }
+                    }}
+                    className="h-8 w-8 rounded-full"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-slate-800 border-slate-700">
+                  <AudioSettings />
+                </DialogContent>
+              </Dialog>
             </div>
             <div className="flex items-center justify-center">
               <SwordsIcon className="h-14 w-14 text-primary" />

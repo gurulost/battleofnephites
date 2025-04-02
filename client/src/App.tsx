@@ -7,14 +7,18 @@ import { EventBridge } from './lib/events/EventBridge';
 import { useGameState } from './lib/stores/useGameState';
 import { useGame } from './lib/stores/useGame';
 import { useGameSetup } from './lib/stores/useGameSetup';
+import { SoundService } from './lib/services/SoundService';
+import { useAudio } from './lib/stores/useAudio';
 
 function App() {
   const [gameStarted, setGameStarted] = useState(false);
   const gameRef = useRef<HTMLDivElement>(null);
   const gameInstance = useRef<Phaser.Game | null>(null);
+  const soundService = useRef<SoundService>(SoundService.getInstance());
   const { gamePhase, startGame } = useGameState();
   const { start: startUIGame } = useGame();
   const { setupPhase } = useGameSetup();
+  const { musicEnabled } = useAudio();
 
   // Initialize the Phaser game when component mounts
   useEffect(() => {
@@ -31,9 +35,39 @@ function App() {
           gameInstance.current.destroy(true);
           gameInstance.current = null;
         }
+        // Stop any playing music when unmounting
+        soundService.current.stopMusic();
       };
     }
   }, []);
+  
+  // Play theme music when the app starts and when music enabled status changes
+  useEffect(() => {
+    if (musicEnabled && gamePhase === 'start') {
+      soundService.current.playMusic('theme');
+    } else {
+      soundService.current.stopMusic();
+    }
+    
+    // Connect SoundService to event system
+    EventBridge.on('game:playSound', (data: { key: string }) => {
+      soundService.current.playSound(data.key);
+    });
+    
+    EventBridge.on('game:playMusic', (data: { key: string }) => {
+      soundService.current.playMusic(data.key);
+    });
+    
+    EventBridge.on('game:stopMusic', () => {
+      soundService.current.stopMusic();
+    });
+    
+    return () => {
+      EventBridge.off('game:playSound');
+      EventBridge.off('game:playMusic');
+      EventBridge.off('game:stopMusic');
+    };
+  }, [musicEnabled, gamePhase]);
 
   // Handle game start
   const handleStartGame = () => {
@@ -45,6 +79,13 @@ function App() {
     // Update both game state stores
     startGame();
     startUIGame();
+    
+    // Play sound effect and switch music to battle theme
+    soundService.current.playSound('select');
+    if (musicEnabled) {
+      soundService.current.stopMusic();
+      soundService.current.playMusic('battle');
+    }
   };
 
   return (

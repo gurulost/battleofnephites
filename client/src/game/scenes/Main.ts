@@ -6,6 +6,7 @@ import { FogOfWar } from '../utils/FogOfWar';
 import Unit from '../entities/Unit';
 import Building from '../entities/Building';
 import { TileType, UnitType, BuildingType } from '../../types/game';
+import { SoundService } from '../../lib/services/SoundService';
 
 export default class MainScene extends Phaser.Scene {
   // Map properties
@@ -33,6 +34,7 @@ export default class MainScene extends Phaser.Scene {
   private movementOverlay: Phaser.GameObjects.Graphics;
   private selectionIndicator: Phaser.GameObjects.Image;
   private fogOfWar!: FogOfWar; // Using definite assignment assertion
+  private soundService: SoundService = SoundService.getInstance();
   
   constructor() {
     super('MainScene');
@@ -100,6 +102,9 @@ export default class MainScene extends Phaser.Scene {
     
     // Set up event handlers for communication with React
     this.setupEventHandlers();
+    
+    // Start playing theme music
+    this.soundService.playMusic('theme');
     
     // Initial UI update
     this.updateUI();
@@ -837,6 +842,9 @@ export default class MainScene extends Phaser.Scene {
       // Show selection highlight
       entity.showSelectionHighlight(true);
       
+      // Play selection sound
+      this.soundService.playSound('select');
+      
       // If it's a unit and it's the current player's turn, show movement range
       if (entity instanceof Unit && entity.playerId === this.getCurrentPlayer().id) {
         this.showMovementRange(entity);
@@ -1001,6 +1009,9 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
+    // Play movement sound
+    this.soundService.playSound('move');
+    
     // Unit can move there - update position
     const moveCost = path.length - 1; // Exclude starting position
     
@@ -1071,6 +1082,9 @@ export default class MainScene extends Phaser.Scene {
       console.log("No actions left for this unit");
       return;
     }
+    
+    // Play attack sound
+    this.soundService.playSound('attack');
     
     // Get terrain at defender's location
     const defenderTile = this.tiles[defender.gridY][defender.gridX];
@@ -1204,6 +1218,13 @@ export default class MainScene extends Phaser.Scene {
     // The player who lost their starting city has been defeated
     const victor = this.players.find(p => p.id !== defeatedPlayerId);
     if (victor) {
+      // Play victory/defeat sound
+      if (victor.id === 'player1') {
+        this.soundService.playSound('victory');
+      } else {
+        this.soundService.playSound('defeat');
+      }
+      
       // Game over - emit victory event
       EventBridge.emit('phaser:gameOver', {
         victorId: victor.id,
@@ -1243,6 +1264,9 @@ export default class MainScene extends Phaser.Scene {
       console.log("Not enough resources to train unit");
       return;
     }
+    
+    // Play unit creation sound
+    this.soundService.playSound('unitCreated');
     
     // Deduct resources
     player.resources.food -= costs[unitType].food;
@@ -1284,6 +1308,9 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
+    // Play building sound
+    this.soundService.playSound('build');
+    
     // Deduct resources
     player.resources.food -= costs[buildingType].food;
     player.resources.production -= costs[buildingType].production;
@@ -1310,6 +1337,9 @@ export default class MainScene extends Phaser.Scene {
     // Check if the tile has resources
     const tile = this.tiles[targetY][targetX];
     if (!tile) return;
+    
+    // Play gather sound
+    this.soundService.playSound('gather');
     
     const tileType = tile.getData('tileType');
     let resourceGained = 0;
