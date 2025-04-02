@@ -185,7 +185,7 @@ export const useGameState = create<GameState>()(
     
     startGame: () => {
       import('../stores/useGameSetup').then(({ useGameSetup }) => {
-        import('../../game/utils/MapGenerator').then(({ generateMap, generatePlayers }) => {
+        import('../../game/utils/MapGenerator').then(({ MapGenerator }) => {
           // Get game setup options
           const { 
             selectedMode, 
@@ -199,11 +199,43 @@ export const useGameState = create<GameState>()(
             return;
           }
           
-          // Generate map based on opponent count
-          const map = generateMap(opponents);
+          // Generate a balanced map based on opponent count
+          const generatedMap = MapGenerator.generateBalancedMap(opponents + 1); // +1 to include human player
           
-          // Generate players based on faction selection and opponent count
-          const players = generatePlayers(selectedFaction, opponents);
+          // Create map object for the game state
+          const map = {
+            width: generatedMap.width,
+            height: generatedMap.height,
+            tiles: [] // Tiles will be created by Phaser
+          };
+          
+          // Create players array
+          const players: Player[] = [];
+          
+          // Add human player (always player1)
+          players.push({
+            id: 'player1',
+            name: selectedFaction === 'nephites' ? 'Nephites' : 'Lamanites',
+            faction: selectedFaction,
+            resources: { food: 10, production: 10 },
+            units: [],
+            buildings: [],
+            startingCityId: 'city1'
+          });
+          
+          // Add AI players
+          const enemyFaction = selectedFaction === 'nephites' ? 'lamanites' : 'nephites';
+          for (let i = 0; i < opponents; i++) {
+            players.push({
+              id: `player${i + 2}`,
+              name: enemyFaction === 'nephites' ? `Nephites ${i + 1}` : `Lamanites ${i + 1}`,
+              faction: enemyFaction,
+              resources: { food: 10, production: 10 },
+              units: [],
+              buildings: [],
+              startingCityId: `city${i + 2}`
+            });
+          }
           
           // Update the game state with the new setup
           set({ 
@@ -215,7 +247,7 @@ export const useGameState = create<GameState>()(
           
           // Send the map and player setup to Phaser
           EventBridge.emit('ui:setupGame', {
-            map,
+            map: generatedMap,
             players,
             gameMode: selectedMode,
             difficulty

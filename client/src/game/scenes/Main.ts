@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { EventBridge } from '../../lib/events/EventBridge';
 import { GridUtils } from '../utils/GridUtils';
 import { PathFinder } from '../utils/PathFinding';
+import { FogOfWar } from '../utils/FogOfWar';
 import Unit from '../entities/Unit';
 import Building from '../entities/Building';
 import { TileType, UnitType, BuildingType } from '../../types/game';
@@ -31,6 +32,7 @@ export default class MainScene extends Phaser.Scene {
   // Graphics
   private movementOverlay: Phaser.GameObjects.Graphics;
   private selectionIndicator: Phaser.GameObjects.Image;
+  private fogOfWar!: FogOfWar; // Using definite assignment assertion
   
   constructor() {
     super('MainScene');
@@ -90,6 +92,9 @@ export default class MainScene extends Phaser.Scene {
     // Place initial units and buildings for both players
     this.placeInitialEntities();
     
+    // Initialize fog of war
+    this.initializeFogOfWar(worldCenterX, worldCenterY);
+    
     // Set up input handlers
     this.setupInputHandlers();
     
@@ -100,7 +105,30 @@ export default class MainScene extends Phaser.Scene {
     this.updateUI();
   }
   
-  initializePlayers(customPlayers = null) {
+  /**
+   * Initializes the fog of war system
+   */
+  initializeFogOfWar(centerX: number, centerY: number) {
+    // Create the fog of war system
+    this.fogOfWar = new FogOfWar(
+      this,
+      this.mapWidth,
+      this.mapHeight,
+      this.tileWidth,
+      this.tileHeight
+    );
+    
+    // Get the player's units
+    const humanPlayer = this.players.find(p => p.id === 'player1');
+    if (humanPlayer) {
+      const playerUnits = this.units.filter(u => u.playerId === humanPlayer.id);
+      
+      // Update visibility based on player's units and buildings
+      this.fogOfWar.update(playerUnits, centerX, centerY);
+    }
+  }
+  
+  initializePlayers(customPlayers: any[] | null = null) {
     // If custom players are provided (from game setup), use those
     if (customPlayers && Array.isArray(customPlayers) && customPlayers.length > 0) {
       this.players = customPlayers;
@@ -166,6 +194,69 @@ export default class MainScene extends Phaser.Scene {
     this.currentPlayerIndex = 0;
   }
   
+  /**
+   * Create a map using the provided tile data
+   */
+  createMapFromData(mapData: any[][], centerX: number, centerY: number) {
+    // Create the tiles array (empty) to be filled with images
+    this.tiles = Array(this.mapHeight).fill(0).map(() => Array(this.mapWidth).fill(null));
+    
+    // Walkability properties for each tile type
+    const walkability: Record<TileType, boolean> = {
+      'grass': true,
+      'forest': true,
+      'hill': true
+    };
+    
+    // Calculate the offset to center the map
+    const mapWidthPx = this.mapWidth * this.tileColumnOffset;
+    const mapHeightPx = this.mapHeight * this.tileRowOffset;
+    
+    // Create the tiles with isometric positioning
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        const tileData = mapData[y][x];
+        const tileType: TileType = tileData.type;
+        
+        // Calculate isometric position
+        const { screenX, screenY } = GridUtils.cartesianToIsometric(
+          x, y, this.tileWidth, this.tileHeight
+        );
+        
+        // Create the tile sprite
+        const tile = this.add.image(
+          centerX + screenX - mapWidthPx / 2,
+          centerY + screenY - mapHeightPx / 2,
+          tileType
+        );
+        
+        // Store the logical grid coordinates and tile type on the tile object for easy access
+        tile.setData('gridX', x);
+        tile.setData('gridY', y);
+        tile.setData('tileType', tileType);
+        tile.setData('walkable', tileData.walkable !== undefined ? tileData.walkable : walkability[tileType]);
+        
+        // Set origin to bottom center for isometric positioning
+        tile.setOrigin(0.5, 1);
+        
+        // Add to our tiles array for later reference
+        this.tiles[y][x] = tile;
+        
+        // Make tile interactive
+        tile.setInteractive();
+        
+        // Update pathfinder with walkability data
+        this.pathFinder.setWalkableAt(x, y, tile.getData('walkable'));
+      }
+    }
+    
+    // Sort all tiles by their y position to handle depth correctly
+    this.children.depthSort();
+  }
+  
+  /**
+   * Create a randomly generated map
+   */
   createMap(centerX: number, centerY: number) {
     // Generate a random map with different tile types
     const tileTypes: TileType[] = ['grass', 'forest', 'hill'];
@@ -255,6 +346,46 @@ export default class MainScene extends Phaser.Scene {
     this.children.depthSort();
   }
   
+  /**
+   * Place initial entities using custom starting positions from map data
+   */
+  placeInitialEntitiesFromData(startingPositions: any) {
+    // Process each player's starting position
+    for (let i = 0; i < this.players.length; i++) {
+      const player = this.players[i];
+      const playerKey = `player${i + 1}`;
+      
+      // Check if we have a valid starting position for this player
+      if (startingPositions[playerKey]) {
+        const startX = startingPositions[playerKey].x;
+        const startY = startingPositions[playerKey].y;
+        
+        // Create player's starting city
+        this.createBuilding('city', startX, startY, player.id, `city${i + 1}`);
+        
+        // Create player's starting worker near city
+        // Try to find an empty adjacent tile
+        const adjacentTiles = this.getAdjacentTiles(startX, startY);
+        let workerPos = { x: startX + 1, y: startY }; // Default position
+        
+        for (const tile of adjacentTiles) {
+          if (this.isValidTile(tile.x, tile.y) && !this.getEntityAtTile(tile.x, tile.y)) {
+            workerPos = tile;
+            break;
+          }
+        }
+        
+        this.createUnit('worker', workerPos.x, workerPos.y, player.id);
+      }
+    }
+    
+    // Update the walkability map based on building positions
+    this.updatePathfinderWalkability();
+  }
+  
+  /**
+   * Place initial entities at default locations
+   */
   placeInitialEntities() {
     // Player 1 starting entities (bottom left area)
     const p1StartX = Math.floor(this.mapWidth * 0.25);
@@ -275,6 +406,27 @@ export default class MainScene extends Phaser.Scene {
     
     // Create player 2's starting worker
     this.createUnit('worker', p2StartX - 1, p2StartY, 'player2');
+    
+    // For additional players (if any)
+    for (let i = 2; i < this.players.length; i++) {
+      // Calculate evenly distributed positions around the map
+      const angle = (i / this.players.length) * 2 * Math.PI;
+      const distance = Math.min(this.mapWidth, this.mapHeight) * 0.4;
+      
+      const centerX = this.mapWidth / 2;
+      const centerY = this.mapHeight / 2;
+      
+      let startX = Math.floor(centerX + Math.cos(angle) * distance);
+      let startY = Math.floor(centerY + Math.sin(angle) * distance);
+      
+      // Ensure coordinates are within the map bounds
+      startX = Math.max(1, Math.min(this.mapWidth - 2, startX));
+      startY = Math.max(1, Math.min(this.mapHeight - 2, startY));
+      
+      // Create starting city and worker
+      this.createBuilding('city', startX, startY, this.players[i].id, `city${i + 1}`);
+      this.createUnit('worker', startX + 1, startY, this.players[i].id);
+    }
     
     // Update the walkability map based on building positions
     this.updatePathfinderWalkability();
@@ -604,10 +756,23 @@ export default class MainScene extends Phaser.Scene {
         // Recreate the map
         const worldCenterX = this.cameras.main.width / 2;
         const worldCenterY = this.cameras.main.height / 3;
-        this.createMap(worldCenterX, worldCenterY);
         
-        // Place initial entities based on player count
-        this.placeInitialEntities();
+        // Use the map data from the generator if available
+        if (data.map.data && Array.isArray(data.map.data)) {
+          this.createMapFromData(data.map.data, worldCenterX, worldCenterY);
+        } else {
+          this.createMap(worldCenterX, worldCenterY);
+        }
+        
+        // Place initial entities based on player count and starting positions
+        if (data.map.startingPositions) {
+          this.placeInitialEntitiesFromData(data.map.startingPositions);
+        } else {
+          this.placeInitialEntities();
+        }
+        
+        // Initialize fog of war
+        this.initializeFogOfWar(worldCenterX, worldCenterY);
         
         // Reset pathfinder with new map size
         this.pathFinder = new PathFinder(this.mapWidth, this.mapHeight);
@@ -845,6 +1010,20 @@ export default class MainScene extends Phaser.Scene {
     // Move the unit
     unit.move(targetX, targetY, path, () => {
       // Callback when movement animation is complete
+      
+      // Update fog of war if this is a player unit
+      if (unit.playerId === 'player1') {
+        // Get world center coordinates for drawing
+        const worldCenterX = this.cameras.main.width / 2;
+        const worldCenterY = this.cameras.main.height / 3;
+        
+        // Get all player units for visibility calculation
+        const playerUnits = this.units.filter(u => u.playerId === 'player1');
+        
+        // Update fog of war
+        this.fogOfWar.update(playerUnits, worldCenterX, worldCenterY);
+      }
+      
       if (onComplete) {
         onComplete();
       }
