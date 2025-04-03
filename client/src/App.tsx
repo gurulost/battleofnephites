@@ -28,6 +28,9 @@ function App() {
         ...GameConfig,
         parent: gameRef.current,
       });
+      
+      // Connect the sound service to the game instance
+      soundService.current.connectToGame(gameInstance.current);
 
       // When component unmounts, destroy the game instance
       return () => {

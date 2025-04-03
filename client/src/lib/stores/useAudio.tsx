@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { SoundMode } from '../services/SoundService';
 
 /**
  * Audio settings and state
@@ -9,12 +10,14 @@ interface AudioState {
   musicEnabled: boolean;
   soundVolume: number;
   musicVolume: number;
+  soundMode: SoundMode;
   
   // Actions
   toggleSound: () => void;
   toggleMusic: () => void;
   setSoundVolume: (volume: number) => void;
   setMusicVolume: (volume: number) => void;
+  setSoundMode: (mode: SoundMode) => void;
   playSound: (soundKey: string) => void;
   playMusic: (musicKey: string) => void;
   stopMusic: () => void;
@@ -30,6 +33,7 @@ export const useAudio = create<AudioState>((set, get) => ({
   musicEnabled: true,
   soundVolume: 0.5,
   musicVolume: 0.3,
+  soundMode: 'hybrid', // Default to hybrid mode
   
   // Toggle sound on/off
   toggleSound: () => {
@@ -65,6 +69,17 @@ export const useAudio = create<AudioState>((set, get) => ({
     
     // Update the volume of any currently playing music
     // This would interact with any active audio elements
+  },
+  
+  // Set sound mode (procedural, recorded, or hybrid)
+  setSoundMode: (mode: SoundMode) => {
+    set({ soundMode: mode });
+    
+    // Update the sound service
+    import('../services/SoundService').then(({ SoundService }) => {
+      const soundService = SoundService.getInstance();
+      soundService.setSoundMode(mode);
+    });
   },
   
   // Play a sound effect
