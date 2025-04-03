@@ -1107,10 +1107,46 @@ export default class MainScene extends Phaser.Scene {
     if (!this.isValidTile(x, y)) return false;
     
     const tile = this.tiles[y][x];
+    if (!tile) return false;
+    
     const tileType = tile.getData('tileType');
     
     // Resource tiles are grass (food), forest (production), and hill (production)
     return tileType === 'grass' || tileType === 'forest' || tileType === 'hill';
+  }
+  
+  /**
+   * Get the resource amount that a worker from a specific faction will gather from a tile
+   */
+  getResourceAmountForFaction(tileType: string, faction: string): { amount: number, type: 'food' | 'production' } {
+    let amount = 0;
+    let type: 'food' | 'production' = 'food';
+    
+    // Base resource amounts
+    if (tileType === 'grass') {
+      amount = 2;
+      type = 'food';
+    } else if (tileType === 'forest') {
+      amount = 2;
+      type = 'production';
+    } else if (tileType === 'hill') {
+      amount = 3;
+      type = 'production';
+    }
+    
+    // Faction-specific bonuses
+    if (faction === 'nephites' && tileType === 'hill') {
+      // Nephites are skilled miners
+      amount += 1; // +1 production from hills
+    } else if (faction === 'lamanites' && tileType === 'forest') {
+      // Lamanites are skilled hunters/gatherers
+      amount += 1; // +1 production from forests
+    } else if (faction === 'mulekites' && tileType === 'grass') {
+      // Mulekites are skilled farmers
+      amount += 1; // +1 food from grassland
+    }
+    
+    return { amount, type };
   }
   
   /**
@@ -1126,6 +1162,12 @@ export default class MainScene extends Phaser.Scene {
    * Moves a unit to a position and then performs an action
    */
   moveUnitForAction(unit: Unit, targetX: number, targetY: number, onComplete: () => void) {
+    // Check if unit has actions left before attempting to move
+    if (unit.actionsLeft <= 0) {
+      console.log("Unit has no actions left");
+      return;
+    }
+    
     // Find a path to an adjacent tile
     const adjacentTiles = this.getAdjacentTiles(targetX, targetY);
     let bestTile = null;
@@ -1134,7 +1176,7 @@ export default class MainScene extends Phaser.Scene {
     for (const tile of adjacentTiles) {
       if (this.isValidTile(tile.x, tile.y) && !this.getEntityAtTile(tile.x, tile.y)) {
         const path = this.pathFinder.findPath(unit.gridX, unit.gridY, tile.x, tile.y, unit.movesLeft);
-        if (path && (shortestPath === null || path.length < shortestPath.length)) {
+        if (path && path.length > 0 && (shortestPath === null || path.length < shortestPath.length)) {
           shortestPath = path;
           bestTile = tile;
         }
@@ -1144,8 +1186,15 @@ export default class MainScene extends Phaser.Scene {
     if (bestTile && shortestPath) {
       // Move to the adjacent tile, then gather
       this.moveUnit(unit, bestTile.x, bestTile.y, () => {
-        onComplete();
+        // After moving, check if the unit still has an action
+        if (unit.actionsLeft > 0) {
+          onComplete();
+        } else {
+          console.log("Unit ran out of actions during movement");
+        }
       });
+    } else {
+      console.log("No valid path to target found within movement range");
     }
   }
   
@@ -1163,6 +1212,9 @@ export default class MainScene extends Phaser.Scene {
     
     // Unit can move there - update position
     const moveCost = path.length - 1; // Exclude starting position
+    
+    // Check if the unit will have any moves left for additional actions
+    const willHaveMovesLeft = unit.movesLeft - moveCost > 0;
     
     // Update walkability maps (unit no longer at old position)
     this.pathFinder.setWalkableAt(unit.gridX, unit.gridY, true);
@@ -1184,6 +1236,7 @@ export default class MainScene extends Phaser.Scene {
         this.fogOfWar.update(playerUnits, worldCenterX, worldCenterY);
       }
       
+      // Call the completion callback if provided
       if (onComplete) {
         onComplete();
       }
@@ -1194,6 +1247,11 @@ export default class MainScene extends Phaser.Scene {
     
     // Reduce movement points
     unit.movesLeft -= moveCost;
+    
+    // If unit used all movement points, they can't perform actions that require movement
+    if (unit.movesLeft <= 0 && unit.actionsLeft > 0) {
+      console.log("Unit has used all movement points but still has actions");
+    }
     
     // Clear and update highlights
     this.clearHighlightedTiles();
@@ -1209,7 +1267,8 @@ export default class MainScene extends Phaser.Scene {
       unitId: unit.id,
       newX: targetX,
       newY: targetY,
-      movesLeft: unit.movesLeft
+      movesLeft: unit.movesLeft,
+      actionsLeft: unit.actionsLeft
     });
   }
   
@@ -1483,34 +1542,36 @@ export default class MainScene extends Phaser.Scene {
   }
   
   gatherResource(worker: Unit, targetX: number, targetY: number) {
+    // First check if worker has actions left
+    if (worker.actionsLeft <= 0) {
+      console.log("Worker has no actions left to gather resources");
+      return;
+    }
+    
     // Check if the tile has resources
     const tile = this.tiles[targetY][targetX];
     if (!tile) return;
     
+    // Validate that it's a proper resource tile
+    const tileType = tile.getData('tileType');
+    if (!this.canGatherFromTile(targetX, targetY)) {
+      console.log(`Cannot gather resources from ${tileType} tile`);
+      return;
+    }
+    
     // Play gather sound
     this.soundService.playSound('gather');
     
-    const tileType = tile.getData('tileType');
-    let resourceGained = 0;
-    let resourceType: 'food' | 'production' = 'food';
+    // Get the player and their faction
+    const player = this.players.find(p => p.id === worker.playerId);
+    if (!player) return;
     
-    // Different tiles provide different resources
-    if (tileType === 'grass') {
-      resourceGained = 2;
-      resourceType = 'food';
-    } else if (tileType === 'forest') {
-      resourceGained = 2;
-      resourceType = 'production';
-    } else if (tileType === 'hill') {
-      resourceGained = 3;
-      resourceType = 'production';
-    }
+    // Calculate resources gained based on faction bonuses
+    const { amount: resourceGained, type: resourceType } = 
+      this.getResourceAmountForFaction(tileType, player.faction);
     
     // Add resources to player
-    const player = this.players.find(p => p.id === worker.playerId);
-    if (player) {
-      player.resources[resourceType] += resourceGained;
-    }
+    player.resources[resourceType] += resourceGained;
     
     // Use up worker's action
     worker.actionsLeft = 0;
@@ -1521,13 +1582,86 @@ export default class MainScene extends Phaser.Scene {
     // Update UI
     this.updateUI();
     
+    // Create special message if faction gets a bonus on this tile type
+    let bonusText = '';
+    if ((player.faction === 'nephites' && tileType === 'hill') ||
+        (player.faction === 'lamanites' && tileType === 'forest') ||
+        (player.faction === 'mulekites' && tileType === 'grass')) {
+      bonusText = ' (Faction Bonus!)';
+    }
+    
+    // Show floating text indicating resource gained
+    this.showResourceGainedText(targetX, targetY, resourceGained, resourceType, bonusText);
+    
     // Emit event for UI
     EventBridge.emit('phaser:resourceGathered', {
       workerId: worker.id,
       resourceType,
       amount: resourceGained,
       tileX: targetX,
-      tileY: targetY
+      tileY: targetY,
+      hasFactionBonus: bonusText !== ''
+    });
+  }
+  
+  /**
+   * Show floating text indicating resource gained
+   */
+  showResourceGainedText(gridX: number, gridY: number, amount: number, resourceType: string, bonusText: string = '') {
+    // Convert grid position to screen coordinates
+    const { screenX, screenY } = GridUtils.cartesianToIsometric(
+      gridX, gridY, 64, 32
+    );
+    
+    // The container position is in the center of the map
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 3;
+    const mapWidth = 15 * 32; // Half tile width for offset * map width
+    const mapHeight = 15 * 16; // Half tile height for offset * map height
+    
+    const x = centerX + screenX - mapWidth / 2;
+    const y = centerY + screenY - mapHeight / 2;
+    
+    // Determine color based on resource type
+    const textColor = resourceType === 'food' ? '#44ff44' : '#ffbb44';
+    
+    // Create the resource text
+    const resourceText = this.add.text(x, y - 50, `+${amount} ${resourceType}${bonusText}`, {
+      fontFamily: 'Arial',
+      fontSize: '20px',
+      color: textColor,
+      stroke: '#000000',
+      strokeThickness: 4,
+      align: 'center'
+    });
+    resourceText.setOrigin(0.5, 0.5);
+    
+    // If this is a bonus, make it slightly larger and add a glow effect
+    if (bonusText) {
+      resourceText.setFontSize(22);
+      
+      // Add a glow effect for bonus resources
+      const glowFX = resourceText.preFX?.addGlow(textColor, 4, 0, false, 0.1, 16);
+      
+      // Add a slight bounce effect
+      this.tweens.add({
+        targets: resourceText,
+        scale: 1.2,
+        duration: 200,
+        yoyo: true
+      });
+    }
+    
+    // Animate the text
+    this.tweens.add({
+      targets: resourceText,
+      y: y - 80,
+      alpha: 0,
+      duration: 1000,
+      delay: bonusText ? 300 : 0, // Delay the fade out for bonus text
+      onComplete: () => {
+        resourceText.destroy();
+      }
     });
   }
   
