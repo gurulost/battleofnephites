@@ -33,14 +33,16 @@ export default class Unit extends Phaser.GameObjects.Container {
   public actionsLeft: number;
   
   // Visual components
-  private sprite: Phaser.GameObjects.Image;
-  private healthBar: Phaser.GameObjects.Graphics;
-  private selectionIndicator: Phaser.GameObjects.Graphics;
+  private sprite!: Phaser.GameObjects.Sprite; // Changed from Image to Sprite to support animations
+  private healthBar!: Phaser.GameObjects.Graphics;
+  private selectionIndicator!: Phaser.GameObjects.Graphics;
+  private animLayer!: Phaser.GameObjects.Container; // For animation effects
   
   // Animation states
   private isMoving: boolean = false;
   private currentPath: {x: number, y: number}[] = [];
   private moveTween?: Phaser.Tweens.Tween;
+  private currentAnimation: string = 'idle';
   
   // Whether this unit can act on the turn it was created
   public canActOnFirstTurn: boolean = true;
@@ -92,11 +94,15 @@ export default class Unit extends Phaser.GameObjects.Container {
       faction = playerEntity.faction;
     }
     
-    // Use faction-specific unit sprites
-    this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
+    // Use faction-specific unit sprites with animation support
+    const sprite = scene.add.sprite(0, 0, `${faction}-${type}`);
+    this.sprite = sprite;
     
     // Set origin to bottom-center for isometric positioning
     this.sprite.setOrigin(0.5, 1);
+    
+    // Create animation container to hold effects
+    this.animLayer = scene.add.container(0, -20);
     
     // Create health bar
     this.healthBar = scene.add.graphics();
@@ -107,7 +113,13 @@ export default class Unit extends Phaser.GameObjects.Container {
     this.selectionIndicator.setVisible(false);
     
     // Add all visual components to the container
-    this.add([this.selectionIndicator, this.sprite, this.healthBar]);
+    this.add([this.selectionIndicator, this.sprite, this.healthBar, this.animLayer]);
+    
+    // Set up idle animation if it exists
+    if (scene.anims.exists(`${faction}-${type}-idle`)) {
+      this.sprite.play(`${faction}-${type}-idle`);
+      this.currentAnimation = 'idle';
+    }
     
     // Set depth based on y-position for proper isometric sorting
     this.setDepth(1000 + this.gridY);
@@ -167,6 +179,9 @@ export default class Unit extends Phaser.GameObjects.Container {
     this.isMoving = true;
     this.currentPath = [...path];
     
+    // Set state to moving which triggers animation
+    this.setUnitState('moving');
+    
     // Remove starting position
     this.currentPath.shift();
     
@@ -179,6 +194,7 @@ export default class Unit extends Phaser.GameObjects.Container {
       this.followPath(onComplete);
     } else {
       this.isMoving = false;
+      this.setUnitState('idle');
       if (onComplete) onComplete();
     }
   }
@@ -247,6 +263,9 @@ export default class Unit extends Phaser.GameObjects.Container {
   }
   
   playAttackAnimation(targetX: number, targetY: number) {
+    // Set attacking state
+    this.setUnitState('attacking');
+    
     // Attack animation with multiple visual effects
     const startX = this.x;
     const startY = this.y;
@@ -340,7 +359,11 @@ export default class Unit extends Phaser.GameObjects.Container {
               x: startX,
               y: startY,
               duration: 250,
-              ease: 'Power1'
+              ease: 'Power1',
+              onComplete: () => {
+                // Return to idle state after attack animation completes
+                this.setUnitState('idle');
+              }
             });
           }
         });
@@ -546,6 +569,9 @@ export default class Unit extends Phaser.GameObjects.Container {
   }
   
   playGatherAnimation() {
+    // Set gathering state
+    this.setUnitState('gathering');
+    
     // Simple gather animation - bob up and down
     this.scene.tweens.add({
       targets: this,
@@ -570,6 +596,8 @@ export default class Unit extends Phaser.GameObjects.Container {
       duration: 800,
       onComplete: () => {
         gatherIcon.destroy();
+        // Return to idle state after gathering animation completes
+        this.setUnitState('idle');
       }
     });
   }
@@ -604,11 +632,71 @@ export default class Unit extends Phaser.GameObjects.Container {
     };
   }
   
+  /**
+   * Play the appropriate animation based on state
+   * @param animName The name of the animation to play
+   */
+  playAnimation(animName: string) {
+    // Only change animation if it's different from current
+    if (this.currentAnimation === animName) return;
+    
+    const faction = this.getFaction();
+    const animKey = `${faction}-${this.type}-${animName}`;
+    
+    // Check if animation exists before playing
+    if (this.scene.anims.exists(animKey)) {
+      this.sprite.play(animKey);
+      this.currentAnimation = animName;
+    }
+  }
+  
+  /**
+   * Get the faction of this unit
+   */
+  getFaction(): string {
+    // Find the player's faction from the players array
+    const playerEntity = (this.scene as any).players?.find((p: any) => p.id === this.playerId);
+    if (playerEntity && playerEntity.faction) {
+      return playerEntity.faction;
+    }
+    return 'nephites'; // Default faction
+  }
+  
+  /**
+   * Set unit state and trigger appropriate animations
+   */
+  setUnitState(newState: string) {
+    const oldState = this.state;
+    this.state = newState;
+    
+    // Trigger animation changes based on state
+    switch (newState) {
+      case 'moving':
+        this.playAnimation('move');
+        break;
+      case 'attacking':
+        this.playAnimation('attack');
+        break;
+      case 'gathering':
+        this.playAnimation('gather');
+        break;
+      case 'idle':
+      default:
+        this.playAnimation('idle');
+        break;
+    }
+  }
+  
   update(time: number, delta: number) {
     // Handle animations or effects over time
     
     // Update depth sorting based on y position
     this.setDepth(1000 + this.gridY);
+    
+    // If we've finished moving or attacking but animation is still playing
+    if (!this.isMoving && this.state !== 'moving' && this.currentAnimation === 'move') {
+      this.playAnimation('idle');
+    }
   }
 }
 
