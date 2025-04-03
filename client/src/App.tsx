@@ -52,13 +52,20 @@ function App() {
       soundService.current.stopMusic();
     }
     
-    // Connect SoundService to event system
-    EventBridge.on('game:playSound', (data: { key: string }) => {
-      soundService.current.playSound(data.key);
+    // Connect SoundService to event system with enhanced event data handling
+    EventBridge.on('game:playSound', (data: { key: string, volume?: number, mode?: string }) => {
+      // Forward all sound requests to the sound service
+      soundService.current.playSound(data.key, data.volume);
+      
+      // Update the sound mode if provided
+      if (data.mode) {
+        soundService.current.setSoundMode(data.mode as any);
+      }
     });
     
-    EventBridge.on('game:playMusic', (data: { key: string }) => {
-      soundService.current.playMusic(data.key);
+    EventBridge.on('game:playMusic', (data: { key: string, volume?: number }) => {
+      // Forward all music requests to the sound service
+      soundService.current.playMusic(data.key, data.volume);
     });
     
     EventBridge.on('game:stopMusic', () => {

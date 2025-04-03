@@ -1328,6 +1328,8 @@ export default class MainScene extends Phaser.Scene {
     // Check if defender is defeated
     if (defender.health <= 0) {
       this.destroyEntity(defender);
+      // Update the pathfinder after entity is destroyed
+      this.updatePathfinderWalkability();
     }
     
     // Update UI
@@ -1641,7 +1643,9 @@ export default class MainScene extends Phaser.Scene {
       resourceText.setFontSize(22);
       
       // Add a glow effect for bonus resources
-      const glowFX = resourceText.preFX?.addGlow(textColor, 4, 0, false, 0.1, 16);
+      // Convert hex color to number for glow effect
+      const colorNum = parseInt(textColor.replace('#', '0x'));
+      const glowFX = resourceText.preFX?.addGlow(colorNum, 4, 0, false, 0.1, 16);
       
       // Add a slight bounce effect
       this.tweens.add({
@@ -1687,7 +1691,7 @@ export default class MainScene extends Phaser.Scene {
             this.createUnit(producedUnit, emptyTile.x, emptyTile.y, building.playerId);
             
             // Update pathfinder
-            this.pathFinder.setWalkableAt(emptyTile.x, emptyTile.y, false);
+            this.updatePathfinderWalkability();
           }
         }
       }
@@ -1715,6 +1719,9 @@ export default class MainScene extends Phaser.Scene {
     
     // Clear selection
     this.selectEntity(null);
+    
+    // Ensure pathfinding grid is up-to-date
+    this.updatePathfinderWalkability();
     
     // Update UI with new turn information
     this.updateUI();

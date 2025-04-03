@@ -89,17 +89,23 @@ export const useAudio = create<AudioState>((set, get) => ({
       return;
     }
     
-    // Use EventBridge to communicate with SoundService
-    const EventBridge = (window as any).EventBridge;
-    if (EventBridge) {
-      EventBridge.emit('game:playSound', { key: soundKey });
-    } else {
-      // Fallback for direct calls before EventBridge is initialized
+    // Import and use EventBridge directly to avoid window dependency
+    import('../events/EventBridge').then(({ EventBridge }) => {
+      // Pass volume settings to ensure consistent playback
+      EventBridge.emit('game:playSound', { 
+        key: soundKey,
+        volume: get().soundVolume,
+        mode: get().soundMode
+      });
+    }).catch(error => {
+      console.error('Failed to load EventBridge for audio playback:', error);
+      
+      // Fallback for direct calls
       import('../services/SoundService').then(({ SoundService }) => {
         const soundService = SoundService.getInstance();
-        soundService.playSound(soundKey);
+        soundService.playSound(soundKey, get().soundVolume);
       });
-    }
+    });
   },
   
   // Play background music
@@ -109,31 +115,37 @@ export const useAudio = create<AudioState>((set, get) => ({
       return;
     }
     
-    // Use EventBridge to communicate with SoundService
-    const EventBridge = (window as any).EventBridge;
-    if (EventBridge) {
-      EventBridge.emit('game:playMusic', { key: musicKey });
-    } else {
-      // Fallback for direct calls before EventBridge is initialized
+    // Import and use EventBridge directly to avoid window dependency
+    import('../events/EventBridge').then(({ EventBridge }) => {
+      // Pass volume settings to ensure consistent playback
+      EventBridge.emit('game:playMusic', { 
+        key: musicKey,
+        volume: get().musicVolume
+      });
+    }).catch(error => {
+      console.error('Failed to load EventBridge for audio playback:', error);
+      
+      // Fallback for direct calls
       import('../services/SoundService').then(({ SoundService }) => {
         const soundService = SoundService.getInstance();
-        soundService.playMusic(musicKey);
+        soundService.playMusic(musicKey, get().musicVolume);
       });
-    }
+    });
   },
   
   // Stop all music
   stopMusic: () => {
-    // Use EventBridge to communicate with SoundService
-    const EventBridge = (window as any).EventBridge;
-    if (EventBridge) {
+    // Import and use EventBridge directly to avoid window dependency
+    import('../events/EventBridge').then(({ EventBridge }) => {
       EventBridge.emit('game:stopMusic');
-    } else {
-      // Fallback for direct calls before EventBridge is initialized
+    }).catch(error => {
+      console.error('Failed to load EventBridge for audio control:', error);
+      
+      // Fallback for direct calls
       import('../services/SoundService').then(({ SoundService }) => {
         const soundService = SoundService.getInstance();
         soundService.stopMusic();
       });
-    }
+    });
   }
 }));

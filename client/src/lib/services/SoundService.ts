@@ -71,19 +71,20 @@ export class SoundService {
   /**
    * Play sound effect depending on action
    * @param soundKey - The key of the sound to play
+   * @param volume - Optional volume override (0-1)
    */
-  public playSound(soundKey: string): void {
+  public playSound(soundKey: string, volume?: number): void {
     // Check if sound is enabled in the store
     if (!useAudio.getState().soundEnabled) {
       return;
     }
     
-    // Get the current volume from store
-    const volume = useAudio.getState().soundVolume;
+    // Get the volume - use parameter if provided, otherwise use store value
+    const soundVolume = volume !== undefined ? volume : useAudio.getState().soundVolume;
     
     // In hybrid mode, try to play pre-recorded sound first and fall back to procedural
     if (this.soundMode === 'hybrid' || this.soundMode === 'recorded') {
-      if (this.tryPlayRecordedSound(soundKey, volume)) {
+      if (this.tryPlayRecordedSound(soundKey, soundVolume)) {
         // Successfully played recorded sound
         return;
       } else if (this.soundMode === 'recorded') {
@@ -178,8 +179,9 @@ export class SoundService {
   /**
    * Play background music
    * @param musicKey - The key of the music track to play
+   * @param volume - Optional volume override (0-1)
    */
-  public playMusic(musicKey: string): void {
+  public playMusic(musicKey: string, volume?: number): void {
     // Check if music is enabled in the store
     if (!useAudio.getState().musicEnabled) {
       return;
@@ -188,8 +190,8 @@ export class SoundService {
     // Stop any existing music
     this.stopMusic();
     
-    // Get the current volume from store
-    const volume = useAudio.getState().musicVolume;
+    // Get the volume - use parameter if provided, otherwise use store value
+    const musicVolume = volume !== undefined ? volume : useAudio.getState().musicVolume;
     
     // Try to play pre-recorded music first
     if (this.soundMode === 'hybrid' || this.soundMode === 'recorded') {
@@ -197,7 +199,7 @@ export class SoundService {
       if (this.game && this.game.sound && this.game.sound.get(musicKey)) {
         this.game.sound.play(musicKey, { 
           loop: true,
-          volume 
+          volume: musicVolume 
         });
         return;
       }
@@ -213,7 +215,7 @@ export class SoundService {
           this.soundCache.set(path, audio);
         }
         
-        audio.volume = volume;
+        audio.volume = musicVolume;
         audio.play().catch(error => {
           console.debug(`Error playing music ${musicKey}: ${error.message}`);
           this.playProceduralMusic(musicKey);
