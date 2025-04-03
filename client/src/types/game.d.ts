@@ -74,6 +74,7 @@ export interface Unit {
   movesLeft: number;
   actionsLeft: number;
   state: EntityState;
+  canActOnFirstTurn: boolean;
 }
 
 export type UnitType = 'worker' | 'melee' | 'ranged';

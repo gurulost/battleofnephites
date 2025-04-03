@@ -80,6 +80,9 @@ export default class MainScene extends Phaser.Scene {
     this.load.svg('attack-indicator', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/target.svg');
     this.load.svg('gather-indicator', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/tool.svg');
     
+    // Load particle image for effects
+    this.load.svg('particle', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/circle.svg');
+    
     // Load unit assets for all factions
     // Nephites
     this.load.svg('nephite-worker', 'assets/images/units/nephite-worker.svg');
@@ -134,6 +137,9 @@ export default class MainScene extends Phaser.Scene {
     this.load.audio('move', 'assets/sounds/move.mp3');
     this.load.audio('select', 'assets/sounds/select.mp3');
     this.load.audio('unit-created', 'assets/sounds/unit-created.mp3');
+    this.load.audio('unit-destroyed', 'assets/sounds/unit-destroyed.mp3');
+    this.load.audio('building-destroyed', 'assets/sounds/building-destroyed.mp3');
+    this.load.audio('error', 'assets/sounds/error.mp3');
     this.load.audio('victory', 'assets/sounds/victory.mp3');
     this.load.audio('defeat', 'assets/sounds/defeat.mp3');
   }
@@ -325,6 +331,14 @@ export default class MainScene extends Phaser.Scene {
         tile.setData('tileType', tileType);
         tile.setData('walkable', tileData.walkable !== undefined ? tileData.walkable : walkability[tileType]);
         
+        // Add resource depletion data
+        // Each resource tile has a limited number of resources that can be gathered
+        if (tileType === 'forest' || tileType === 'hill') {
+          tile.setData('resourcesLeft', 5); // Each forest/hill has 5 production resources
+        } else if (tileType === 'grass') {
+          tile.setData('resourcesLeft', 8); // Each grass tile has 8 food resources
+        }
+        
         // Set origin to bottom center for isometric positioning
         tile.setOrigin(0.5, 1);
         
@@ -419,6 +433,14 @@ export default class MainScene extends Phaser.Scene {
         tile.setData('gridY', y);
         tile.setData('tileType', tileType);
         tile.setData('walkable', mapData[y][x].walkable);
+        
+        // Add resource depletion data
+        // Each resource tile has a limited number of resources that can be gathered
+        if (tileType === 'forest' || tileType === 'hill') {
+          tile.setData('resourcesLeft', 5); // Each forest/hill has 5 production resources
+        } else if (tileType === 'grass') {
+          tile.setData('resourcesLeft', 8); // Each grass tile has 8 food resources
+        }
         
         // Set origin to bottom center for isometric positioning
         tile.setOrigin(0.5, 1);
@@ -1547,8 +1569,77 @@ export default class MainScene extends Phaser.Scene {
     // Make the tile walkable again
     this.pathFinder.setWalkableAt(entity.gridX, entity.gridY, true);
     
+    // Store entity position for death effect
+    const entityX = entity.x;
+    const entityY = entity.y;
+    const isUnit = entity instanceof Unit;
+    
+    // Create death animation effect
+    if (isUnit) {
+      // Play death sound
+      this.soundService.playSound('unitDestroyed');
+      
+      // Create death particles effect for unit
+      const particles = this.add.particles(0, 0, 'particle', {
+        x: entityX,
+        y: entityY,
+        speed: { min: 20, max: 50 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 0.6, end: 0 },
+        lifespan: 800,
+        quantity: 15,
+        tint: 0xff0000
+      });
+      
+      // Auto-destroy particles after animation completes
+      this.time.delayedCall(800, () => {
+        particles.destroy();
+      });
+      
+      // Add a "defeated" text that fades up
+      const defeatText = this.add.text(entityX, entityY - 20, 'Defeated!', {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#ff0000',
+        stroke: '#000000',
+        strokeThickness: 3
+      });
+      defeatText.setOrigin(0.5, 0.5);
+      
+      // Animate the text
+      this.tweens.add({
+        targets: defeatText,
+        y: entityY - 60,
+        alpha: 0,
+        duration: 1000,
+        onComplete: () => {
+          defeatText.destroy();
+        }
+      });
+    } else {
+      // For buildings, create a "collapse" effect
+      this.soundService.playSound('buildingDestroyed');
+      
+      // Create smoke/dust particles
+      const particles = this.add.particles(0, 0, 'particle', {
+        x: entityX,
+        y: entityY,
+        speed: { min: 10, max: 30 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 1, end: 0 },
+        lifespan: 1200,
+        quantity: 25,
+        tint: 0x888888
+      });
+      
+      // Auto-destroy particles after animation completes
+      this.time.delayedCall(1200, () => {
+        particles.destroy();
+      });
+    }
+    
     // Remove from appropriate array
-    if (entity instanceof Unit) {
+    if (isUnit) {
       this.units = this.units.filter(u => u.id !== entity.id);
       
       // Remove from player's units array
@@ -1572,8 +1663,20 @@ export default class MainScene extends Phaser.Scene {
       }
     }
     
-    // Physically destroy the sprite
-    entity.destroy();
+    // Add a short delay before physically destroying the entity
+    // This gives time for death animation to be visible
+    this.time.delayedCall(200, () => {
+      // Fade out the entity
+      this.tweens.add({
+        targets: entity,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => {
+          // Physically destroy the sprite
+          entity.destroy();
+        }
+      });
+    });
     
     // If this was the selected entity, clear selection
     if (this.selectedEntity && this.selectedEntity.id === entity.id) {
@@ -1585,6 +1688,8 @@ export default class MainScene extends Phaser.Scene {
     // The player who lost their starting city has been defeated
     const victor = this.players.find(p => p.id !== defeatedPlayerId);
     if (victor) {
+      console.log(`Player ${defeatedPlayerId} has been defeated! Player ${victor.id} is victorious!`);
+      
       // Play victory/defeat sound
       if (victor.id === 'player1') {
         this.soundService.playSound('victory');
@@ -1592,11 +1697,100 @@ export default class MainScene extends Phaser.Scene {
         this.soundService.playSound('defeat');
       }
       
-      // Game over - emit victory event
-      EventBridge.emit('phaser:gameOver', {
-        victorId: victor.id,
-        victoryType: 'conquest'
+      // Create a visual victory notification on screen
+      const isPlayerVictory = victor.id === 'player1';
+      const message = isPlayerVictory ? 'VICTORY!' : 'DEFEAT!';
+      const textColor = isPlayerVictory ? '#44ff44' : '#ff4444';
+      
+      // First create a darkened overlay for the game screen
+      const overlay = this.add.rectangle(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2,
+        this.cameras.main.width,
+        this.cameras.main.height,
+        0x000000,
+        0.7
+      );
+      overlay.setDepth(5000); // Ensure it appears above everything
+      
+      // Add the victory/defeat text
+      const victoryText = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 - 50,
+        message,
+        {
+          fontFamily: 'Arial',
+          fontSize: '72px',
+          fontStyle: 'bold',
+          color: textColor,
+          stroke: '#000000',
+          strokeThickness: 8,
+          align: 'center'
+        }
+      );
+      victoryText.setOrigin(0.5, 0.5);
+      victoryText.setDepth(5001);
+      
+      // Add some detail text
+      const victoryReason = `You have ${isPlayerVictory ? 'captured' : 'lost'} the enemy's starting city!`;
+      const detailText = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 + 30,
+        victoryReason,
+        {
+          fontFamily: 'Arial',
+          fontSize: '24px',
+          color: '#ffffff',
+          stroke: '#000000',
+          strokeThickness: 4,
+          align: 'center'
+        }
+      );
+      detailText.setOrigin(0.5, 0.5);
+      detailText.setDepth(5001);
+      
+      // Add continue button text
+      const continueText = this.add.text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 + 100,
+        'Click anywhere to continue',
+        {
+          fontFamily: 'Arial',
+          fontSize: '20px',
+          color: '#aaaaaa',
+          align: 'center'
+        }
+      );
+      continueText.setOrigin(0.5, 0.5);
+      continueText.setDepth(5001);
+      
+      // Make the continue text pulse
+      this.tweens.add({
+        targets: continueText,
+        alpha: 0.5,
+        duration: 1000,
+        yoyo: true,
+        repeat: -1
       });
+      
+      // Add input handler to dismiss the game over screen
+      this.input.once('pointerdown', () => {
+        // Clean up the game over UI
+        overlay.destroy();
+        victoryText.destroy();
+        detailText.destroy();
+        continueText.destroy();
+        
+        // Game over - emit victory event to React UI
+        EventBridge.emit('phaser:gameOver', {
+          victorId: victor.id,
+          victoryType: 'conquest',
+          victorFaction: victor.faction
+        });
+      });
+      
+      // Also pause gameplay
+      this.scene.pause();
     }
   }
   
@@ -1718,6 +1912,19 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
+    // Check if tile has any resources left
+    const resourcesLeft = tile.getData('resourcesLeft') || 0;
+    if (resourcesLeft <= 0) {
+      console.log(`This ${tileType} tile has been depleted of resources`);
+      
+      // Show depleted message
+      this.showResourceGainedText(targetX, targetY, 0, 'depleted', ' (Depleted)');
+      
+      // Play fail sound
+      this.soundService.playSound('error');
+      return;
+    }
+    
     // Play gather sound
     this.soundService.playSound('gather');
     
@@ -1738,6 +1945,25 @@ export default class MainScene extends Phaser.Scene {
     // Show gathering animation
     worker.playGatherAnimation();
     
+    // Deplete resource from tile
+    const newResourcesLeft = resourcesLeft - 1;
+    tile.setData('resourcesLeft', newResourcesLeft);
+    
+    // Update tile appearance based on resources left
+    if (newResourcesLeft <= 0) {
+      // Apply a desaturated filter to show depletion
+      tile.setTint(0xaaaaaa);
+    } else if (newResourcesLeft <= 2) {
+      // Critical low resources - reddish tint
+      tile.setTint(0xff9999);
+    } else if (newResourcesLeft <= 3) {
+      // Low resources - yellowish tint
+      tile.setTint(0xffee88);
+    } else {
+      // Plenty of resources - normal color
+      tile.clearTint();
+    }
+    
     // Update UI
     this.updateUI();
     
@@ -1752,6 +1978,11 @@ export default class MainScene extends Phaser.Scene {
     // Show floating text indicating resource gained
     this.showResourceGainedText(targetX, targetY, resourceGained, resourceType, bonusText);
     
+    // Add a small indicator of resources left
+    if (newResourcesLeft <= 2 && newResourcesLeft > 0) {
+      this.showResourceGainedText(targetX, targetY + 0.2, newResourcesLeft, 'left', ' remaining');
+    }
+    
     // Emit event for UI
     EventBridge.emit('phaser:resourceGathered', {
       workerId: worker.id,
@@ -1759,7 +1990,8 @@ export default class MainScene extends Phaser.Scene {
       amount: resourceGained,
       tileX: targetX,
       tileY: targetY,
-      hasFactionBonus: bonusText !== ''
+      hasFactionBonus: bonusText !== '',
+      resourcesLeft: newResourcesLeft
     });
   }
   
@@ -1782,10 +2014,28 @@ export default class MainScene extends Phaser.Scene {
     const y = centerY + screenY - mapHeight / 2;
     
     // Determine color based on resource type
-    const textColor = resourceType === 'food' ? '#44ff44' : '#ffbb44';
+    let textColor = '#ffffff'; // Default
+    if (resourceType === 'food') {
+      textColor = '#44ff44'; // Green for food
+    } else if (resourceType === 'production') {
+      textColor = '#ffbb44'; // Orange for production
+    } else if (resourceType === 'depleted') {
+      textColor = '#ff4444'; // Red for depleted message
+    } else if (resourceType === 'left') {
+      textColor = '#aaaaaa'; // Gray for resources left
+    }
     
-    // Create the resource text
-    const resourceText = this.add.text(x, y - 50, `+${amount} ${resourceType}${bonusText}`, {
+    // Create the resource text with proper formatting based on type
+    let message = `+${amount} ${resourceType}${bonusText}`;
+    
+    // Special case formatting for depleted resources and resources left
+    if (resourceType === 'depleted') {
+      message = `Resources Depleted${bonusText}`;
+    } else if (resourceType === 'left') {
+      message = `${amount} ${bonusText}`;
+    }
+    
+    const resourceText = this.add.text(x, y - 50, message, {
       fontFamily: 'Arial',
       fontSize: '20px',
       color: textColor,

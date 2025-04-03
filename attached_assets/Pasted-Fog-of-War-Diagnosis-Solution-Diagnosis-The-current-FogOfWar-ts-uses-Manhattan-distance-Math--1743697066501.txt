@@ -1,0 +1,27 @@
+Fog of War Diagnosis & Solution
+
+Diagnosis:
+
+The current FogOfWar.ts  uses Manhattan distance (Math.abs(dx) + Math.abs(dy) <= sightRange)  for visibility. This creates unnatural diamond shapes on the isometric grid.   
+It doesn't account for line-of-sight blockers (like hills ). A unit shouldn't see through a tall hill.   
+Drawing fog with individual tile polygonscan be inefficient and visually jarring, lacking smooth transitions between fog levels (unexplored, explored-but-hidden, visible).
+Updates seem tied mainly to player unit movement, potentially missing updates when buildings are constructed or enemy units move into view.   
+More Elegant & Beautiful Solution (Render Texture Approach):
+
+This approach uses a separate texture layer to draw the fog, allowing for smoother visuals and better performance.
+
+Field of View (FOV): Replace the Manhattan distance check with a proper FOV algorithm (like Recursive Shadowcasting, adapted for isometric grids). This calculates which tiles are actually visible from a source point, considering range and line-of-sight blockers (define hills as blockers).
+Vision Sources: Calculate FOV from all player-controlled units and buildings (cities likely have a sight range too). Combine the results to get the total currently visible area.
+Fog Layer (RenderTexture):
+Create a full-screen Phaser.GameObjects.RenderTexture object in FogOfWar.ts. Set its depth high (e.g., 5000) so it draws over everything else.
+Create two reusable "brush" shapes (e.g., Phaser.GameObjects.Graphics circles slightly larger than a tile):
+revealedBrush: Semi-transparent black (e.g., 0x000000, alpha 0.4).
+visibleBrush: Fully transparent black (e.g., 0x000000, alpha 0). Note: Using alpha 0 directly with draw might not work as expected; you might need to use erase with a solid shape, or draw with a specific blend mode like Phaser.BlendModes.ERASE.
+Drawing Logic (drawFog method):
+Clear & Fill: Start by clearing the fogTexture and filling it entirely with the darkest fog color (unexplored, e.g., 0x000000, alpha 0.8).
+Draw Explored Fog: Iterate through your visibilityMap (tiles ever seen). For each tile that has been seen but is not currently visible, draw the revealedBrush onto the fogTexture at that tile's isometric screen position.
+Erase Visible Area: Iterate through your currentVisibility map (populated by the FOV results). For each currently visible tile, erase (or draw with ERASE blend mode) using the visibleBrush shape onto the fogTexture at that tile's screen position. The overlapping erased areas will create the visible zone.
+Update Trigger: Call the FogOfWar.update() method (which recalculates FOV and redraws the fog texture) at the end of player unit moves, potentially after building placement, and possibly at the start of the player's turn to catch enemy movements.
+This approach decouples the fog visual from individual tiles, uses a more realistic visibility calculation (FOV), and leverages Phaser's rendering capabilities for smoother, more atmospheric fog effects. Remember to adjust brush sizes and alpha values to get the desired visual style.
+
+gurulost

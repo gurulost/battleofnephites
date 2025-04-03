@@ -75,15 +75,19 @@ export const SelectionPanel = ({ entity, onBuildClick, onTrainClick }: Selection
         )}
         
         {/* Production queue for buildings */}
-        {'productionQueue' in entity && (entity as Building).productionQueue.length > 0 && (
+        {!isUnit && 'productionQueue' in entity && Array.isArray((entity as Building).productionQueue) && (entity as Building).productionQueue.length > 0 && (
           <div className="mb-4">
             <h3 className="text-sm font-medium mb-1">Production Queue:</h3>
             <div className="bg-slate-800 p-2 rounded text-xs">
               {(entity as Building).productionQueue.map((unitType, idx) => (
                 <div key={idx} className="flex justify-between">
                   <span>{capitalize(unitType)}</span>
-                  {idx === 0 && (entity as Building).turnsToNextUnit > 0 && (
-                    <span>{(entity as Building).turnsToNextUnit} turns</span>
+                  {idx === 0 && (
+                    <span>
+                      {typeof (entity as Building).turnsToNextUnit === 'number' 
+                        ? `${(entity as Building).turnsToNextUnit} turns` 
+                        : 'In progress'}
+                    </span>
                   )}
                 </div>
               ))}
