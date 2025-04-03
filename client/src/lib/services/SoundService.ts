@@ -240,29 +240,97 @@ export class SoundService {
    * @param musicKey - The key of the music track to play
    */
   private playProceduralMusic(musicKey: string): void {
-    // Use procedurally generated music
-    switch (musicKey) {
-      case 'theme':
-        // Play theme music every few seconds to create continuous background
-        audioUtils.playThemeMusic();
-        this.themeInterval = window.setInterval(() => {
-          if (useAudio.getState().musicEnabled) {
-            audioUtils.playThemeMusic();
-          }
-        }, 8000) as unknown as number;
-        break;
-      case 'battle':
-        // Play battle music every few seconds to create continuous background
-        audioUtils.playBattleMusic();
-        this.battleInterval = window.setInterval(() => {
-          if (useAudio.getState().musicEnabled) {
-            audioUtils.playBattleMusic();
-          }
-        }, 7200) as unknown as number;
-        break;
-      default:
-        console.warn(`Music key not recognized for procedural audio: ${musicKey}`);
-    }
+    // Import enhanced audio engine for dynamic music generation
+    import('../utils/audioEngine').then((AudioEngine) => {
+      // Use procedurally generated music based on the music key
+      switch (musicKey) {
+        case 'theme':
+        case 'exploration':
+          // Play Mesoamerican exploration music
+          AudioEngine.playExplorationMusic(0.4, 30);
+          
+          // Set up interval to periodically regenerate music for continuous background
+          this.themeInterval = window.setInterval(() => {
+            if (useAudio.getState().musicEnabled) {
+              AudioEngine.playExplorationMusic(0.4, 30);
+            }
+          }, 29000) as unknown as number; // Slightly shorter than duration to avoid gaps
+          break;
+          
+        case 'battle':
+        case 'combat':
+          // Play Mesoamerican combat music with higher intensity
+          AudioEngine.playCombatMusic(0.7, 25);
+          
+          // Set up interval for continuous battle music
+          this.battleInterval = window.setInterval(() => {
+            if (useAudio.getState().musicEnabled) {
+              AudioEngine.playCombatMusic(0.7, 25);
+            }
+          }, 24000) as unknown as number; // Slightly shorter than duration to avoid gaps
+          break;
+          
+        case 'victory':
+          // Play victory ceremonial music (no loop needed for victory/defeat)
+          AudioEngine.playCeremonialMusic(true, 20);
+          break;
+          
+        case 'defeat':
+          // Play defeat ceremonial music (no loop needed for victory/defeat)
+          AudioEngine.playCeremonialMusic(false, 20);
+          break;
+          
+        case 'ambience':
+          // Play subtle ambient background sounds
+          AudioEngine.generateAmbientNatureSounds(30, 0.5);
+          AudioEngine.generateAmbientFluteLayer(220, 30, 0.3);
+          
+          // Set up interval for continuous ambient sounds
+          this.themeInterval = window.setInterval(() => {
+            if (useAudio.getState().musicEnabled) {
+              AudioEngine.generateAmbientNatureSounds(30, 0.5);
+              AudioEngine.generateAmbientFluteLayer(220, 30, 0.3);
+            }
+          }, 29000) as unknown as number;
+          break;
+          
+        default:
+          // For unrecognized keys, fall back to the simple demonstration track
+          AudioEngine.playSimpleAncientTrack();
+          console.warn(`Music key not recognized for procedural audio: ${musicKey}, playing fallback track`);
+          
+          // Set up interval for the fallback track
+          this.themeInterval = window.setInterval(() => {
+            if (useAudio.getState().musicEnabled) {
+              AudioEngine.playSimpleAncientTrack();
+            }
+          }, 10000) as unknown as number;
+      }
+    }).catch(error => {
+      console.error('Failed to load Audio Engine for procedural music:', error);
+      
+      // Fall back to legacy procedural audio if there's an error
+      switch (musicKey) {
+        case 'theme':
+          audioUtils.playThemeMusic();
+          this.themeInterval = window.setInterval(() => {
+            if (useAudio.getState().musicEnabled) {
+              audioUtils.playThemeMusic();
+            }
+          }, 8000) as unknown as number;
+          break;
+        case 'battle':
+          audioUtils.playBattleMusic();
+          this.battleInterval = window.setInterval(() => {
+            if (useAudio.getState().musicEnabled) {
+              audioUtils.playBattleMusic();
+            }
+          }, 7200) as unknown as number;
+          break;
+        default:
+          console.warn(`Music key not recognized for procedural audio: ${musicKey}`);
+      }
+    });
   }
   
   /**

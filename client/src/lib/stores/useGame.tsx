@@ -6,10 +6,14 @@ import { GamePhase as GameStatePhase } from "../../types/game";
 // Local GamePhase for UI state - separate from game logic phase
 export type GamePhase = "ready" | "playing" | "ended";
 
+// Music contexts for different game states
+export type MusicContext = 'exploration' | 'combat' | 'victory' | 'defeat' | 'ambience';
+
 interface GameState {
   phase: GamePhase;
   musicPlaying: boolean;
   soundEffectsEnabled: boolean;
+  currentMusicContext: MusicContext;
   
   // Actions
   start: () => void;
@@ -18,6 +22,7 @@ interface GameState {
   toggleMusic: () => void;
   toggleSoundEffects: () => void;
   playSound: (soundKey: string) => void;
+  switchMusicContext: (context: MusicContext) => void;
 }
 
 export const useGame = create<GameState>()(
@@ -25,16 +30,20 @@ export const useGame = create<GameState>()(
     phase: "ready",
     musicPlaying: true,
     soundEffectsEnabled: true,
+    currentMusicContext: 'exploration',
     
     start: () => {
       set((state) => {
         // Only transition from ready to playing
         if (state.phase === "ready") {
-          // Play theme music when starting the game
+          // Play exploration music when starting the game
           if (state.musicPlaying) {
-            useAudio.getState().playMusic('theme');
+            useAudio.getState().playMusic('exploration');
           }
-          return { phase: "playing" };
+          return { 
+            phase: "playing",
+            currentMusicContext: 'exploration'
+          };
         }
         return {};
       });
@@ -43,14 +52,26 @@ export const useGame = create<GameState>()(
     restart: () => {
       // Stop any current music
       useAudio.getState().stopMusic();
-      set(() => ({ phase: "ready" }));
+      set(() => ({ 
+        phase: "ready",
+        currentMusicContext: 'exploration'
+      }));
     },
     
-    end: () => {
+    end: (isVictory = false) => {
       set((state) => {
         // Only transition from playing to ended
         if (state.phase === "playing") {
-          return { phase: "ended" };
+          // Play appropriate victory/defeat music
+          if (state.musicPlaying) {
+            const musicKey = isVictory ? 'victory' : 'defeat';
+            useAudio.getState().playMusic(musicKey);
+          }
+          
+          return { 
+            phase: "ended",
+            currentMusicContext: isVictory ? 'victory' : 'defeat'
+          };
         }
         return {};
       });
@@ -62,6 +83,11 @@ export const useGame = create<GameState>()(
         
         // Update the audio system
         useAudio.getState().toggleMusic();
+        
+        // If turning music back on, resume with current context
+        if (newMusicState && state.phase === "playing") {
+          useAudio.getState().playMusic(state.currentMusicContext);
+        }
         
         return { musicPlaying: newMusicState };
       });
@@ -81,6 +107,23 @@ export const useGame = create<GameState>()(
     playSound: (soundKey: string) => {
       if (get().soundEffectsEnabled) {
         useAudio.getState().playSound(soundKey);
+      }
+    },
+    
+    switchMusicContext: (context: MusicContext) => {
+      const state = get();
+      // Only switch if music is enabled and the context is different
+      if (state.musicPlaying && state.currentMusicContext !== context) {
+        // Update state first
+        set({ currentMusicContext: context });
+        
+        // Then play the appropriate music
+        useAudio.getState().playMusic(context);
+        
+        console.log(`Music context switched to: ${context}`);
+      } else {
+        // Just update the context state without playing
+        set({ currentMusicContext: context });
       }
     }
   }))

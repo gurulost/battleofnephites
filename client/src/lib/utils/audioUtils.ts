@@ -1,31 +1,21 @@
 /**
  * Audio utilities for procedurally generating game sounds
  * Provides simple functions for generating sounds with a feel of ancient/historical authenticity
+ * 
+ * This module serves as a bridge between the existing audio system and the new
+ * Mesoamerican-inspired audio engine. It re-exports the new functions while maintaining
+ * compatibility with existing code.
  */
 
-/**
- * Get or create the audio context
- */
+// Import the enhanced audio engine
+import * as AudioEngine from './audioEngine';
+
+// Re-export the AudioContext accessor for compatibility
 export function getAudioContext(): AudioContext {
-  const ctx = (window as any).audioContext;
-  if (ctx) return ctx;
-  
-  const newCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  (window as any).audioContext = newCtx;
-  return newCtx;
+  return AudioEngine.getAudioContext();
 }
 
-/**
- * Create a simple oscillator sound with envelope
- * @param frequency - Base frequency of the sound
- * @param type - Type of waveform
- * @param duration - Duration of the sound in seconds
- * @param volume - Volume of the sound (0-1)
- * @param attack - Attack time in seconds
- * @param decay - Decay time in seconds
- * @param sustain - Sustain level (0-1)
- * @param release - Release time in seconds
- */
+// Re-export the basic tone/sound functions with compatibility layers
 export function playTone(
   frequency: number,
   type: OscillatorType = 'sine', 
@@ -36,167 +26,68 @@ export function playTone(
   sustain = 0.5,
   release = 0.1
 ): void {
-  const ctx = getAudioContext();
-  
-  // Create oscillator and gain node
-  const oscillator = ctx.createOscillator();
-  const gainNode = ctx.createGain();
-  
-  // Connect nodes
-  oscillator.connect(gainNode);
-  gainNode.connect(ctx.destination);
-  
-  // Set oscillator type and frequency
-  oscillator.type = type;
-  oscillator.frequency.value = frequency;
-  
-  // Set initial volume to 0
-  gainNode.gain.value = 0;
-  
-  // Schedule envelope
-  const now = ctx.currentTime;
-  gainNode.gain.linearRampToValueAtTime(0, now);
-  gainNode.gain.linearRampToValueAtTime(volume, now + attack);
-  gainNode.gain.linearRampToValueAtTime(volume * sustain, now + attack + decay);
-  gainNode.gain.linearRampToValueAtTime(0, now + attack + decay + duration + release);
-  
-  // Start and stop the oscillator
-  oscillator.start(now);
-  oscillator.stop(now + attack + decay + duration + release);
+  // Map to appropriate engine function based on type
+  if (type === 'sine' || type === 'triangle') {
+    AudioEngine.playFlute(frequency, duration, undefined, volume);
+  } else {
+    // For other oscillator types, use plucked string if higher frequency
+    if (frequency > 300) {
+      AudioEngine.playPluckedString(frequency, duration, undefined, volume);
+    } else {
+      // Otherwise use percussion for lower tones
+      AudioEngine.playPercussion('deepDrum', undefined, volume);
+    }
+  }
 }
 
-/**
- * Create a percussion sound
- * @param frequency - Base frequency
- * @param duration - Duration in seconds
- * @param volume - Volume (0-1)
- */
+// Map the basic percussion function to the enhanced engine
 export function playPercussion(
   frequency = 200,
   duration = 0.2,
   volume = 0.5
 ): void {
-  const ctx = getAudioContext();
+  // Map frequency ranges to different percussion types
+  let percussionType: 'deepDrum' | 'woodBlock' | 'rattle' | 'shell';
   
-  // Create oscillator and gain node
-  const oscillator = ctx.createOscillator();
-  const gainNode = ctx.createGain();
+  if (frequency < 100) {
+    percussionType = 'deepDrum';
+  } else if (frequency < 200) {
+    percussionType = 'woodBlock';
+  } else if (frequency < 300) {
+    percussionType = 'rattle';
+  } else {
+    percussionType = 'shell';
+  }
   
-  // Connect nodes
-  oscillator.connect(gainNode);
-  gainNode.connect(ctx.destination);
-  
-  // Create a short, percussive sound
-  oscillator.type = 'triangle';
-  oscillator.frequency.value = frequency;
-  
-  const now = ctx.currentTime;
-  
-  // Very short attack, quick decay
-  gainNode.gain.setValueAtTime(0, now);
-  gainNode.gain.linearRampToValueAtTime(volume, now + 0.005);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
-  
-  oscillator.start(now);
-  oscillator.stop(now + duration);
+  AudioEngine.playPercussion(percussionType, undefined, volume);
 }
 
-/**
- * Play a plucked string sound (like a harp or lyre)
- * @param frequency - Base frequency
- * @param duration - Duration in seconds
- * @param volume - Volume (0-1)
- */
+// Map the plucked string function
 export function playPluckedString(
   frequency = 440,
   duration = 0.6,
   volume = 0.3
 ): void {
-  const ctx = getAudioContext();
-  
-  // Create oscillator and gain node
-  const oscillator = ctx.createOscillator();
-  const gainNode = ctx.createGain();
-  
-  // Create filter for more string-like sound
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = 1500;
-  filter.Q.value = 0.5;
-  
-  // Connect nodes
-  oscillator.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(ctx.destination);
-  
-  // Set parameters
-  oscillator.type = 'triangle';
-  oscillator.frequency.value = frequency;
-  
-  const now = ctx.currentTime;
-  
-  // Plucked string envelope
-  gainNode.gain.setValueAtTime(0, now);
-  gainNode.gain.linearRampToValueAtTime(volume, now + 0.005);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
-  
-  // Slight detuning over time
-  oscillator.frequency.setValueAtTime(frequency, now);
-  oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.98, now + duration);
-  
-  oscillator.start(now);
-  oscillator.stop(now + duration);
+  AudioEngine.playPluckedString(frequency, duration, undefined, volume);
 }
 
-/**
- * Play a horn or trumpet sound
- * @param frequency - Base frequency
- * @param duration - Duration in seconds
- * @param volume - Volume (0-1)
- */
+// Map the horn function
 export function playHorn(
   frequency = 220,
   duration = 0.8,
   volume = 0.4
 ): void {
-  const ctx = getAudioContext();
+  // Use shell percussion for horn-like sound
+  AudioEngine.playPercussion('shell', undefined, volume);
   
-  // Create oscillator and gain node
-  const oscillator = ctx.createOscillator();
-  const gainNode = ctx.createGain();
-  
-  // Create filter for brass-like tone
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = 1000;
-  filter.Q.value = 5;
-  
-  // Connect nodes
-  oscillator.connect(filter);
-  filter.connect(gainNode);
-  gainNode.connect(ctx.destination);
-  
-  // Set parameters
-  oscillator.type = 'square';
-  oscillator.frequency.value = frequency;
-  
-  const now = ctx.currentTime;
-  
-  // Horn-like envelope
-  gainNode.gain.setValueAtTime(0, now);
-  gainNode.gain.linearRampToValueAtTime(volume * 0.7, now + 0.1);
-  gainNode.gain.linearRampToValueAtTime(volume, now + 0.2);
-  gainNode.gain.linearRampToValueAtTime(volume * 0.9, now + duration - 0.1);
-  gainNode.gain.linearRampToValueAtTime(0, now + duration);
-  
-  // Filter modulation
-  filter.frequency.setValueAtTime(600, now);
-  filter.frequency.linearRampToValueAtTime(1500, now + 0.1);
-  filter.frequency.linearRampToValueAtTime(1000, now + duration);
-  
-  oscillator.start(now);
-  oscillator.stop(now + duration);
+  // Add a flute layer for richer sound
+  setTimeout(() => {
+    AudioEngine.playFlute(frequency, duration, undefined, volume * 0.6);
+  }, 100);
 }
+
+// Re-export the audio engine's master volume control
+export const setMasterVolume = AudioEngine.setMasterVolume;
 
 // Sound effect generators
 
