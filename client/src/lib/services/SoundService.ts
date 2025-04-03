@@ -94,8 +94,118 @@ export class SoundService {
       }
     }
     
-    // Use procedurally generated sounds if we're in procedural mode
-    // or if hybrid mode couldn't find a recorded sound
+    // Attempt to use enhanced audio engine for procedural sound effects
+    import('../utils/audioEngine').then((AudioEngine) => {
+      // Options for sound effects
+      const options = { volume: soundVolume };
+      
+      // Use the enhanced audio engine based on the sound key
+      switch (soundKey) {
+        case 'attack':
+          // Use metallic percussion or horn for attack sounds
+          if (Math.random() > 0.5) {
+            AudioEngine.playPercussion('metalClang', options);
+          } else {
+            // First parameter is frequency
+            const frequency = 180 + Math.random() * 40;
+            AudioEngine.playHorn(frequency, { ...options, duration: 0.8 });
+          }
+          break;
+          
+        case 'build':
+          // Use stone or wood percussion for building sounds
+          if (Math.random() > 0.5) {
+            AudioEngine.playPercussion('stoneHit', options);
+          } else {
+            AudioEngine.playPercussion('slitDrum', options);
+          }
+          break;
+          
+        case 'gather':
+          // Use rattle or plucked string for resource gathering
+          if (Math.random() > 0.5) {
+            AudioEngine.playPercussion('rattle', options);
+          } else {
+            // First parameter is frequency
+            const frequency = 220 + Math.random() * 100;
+            AudioEngine.playPluckedString(frequency, {
+              ...options,
+              duration: 0.5
+            });
+          }
+          break;
+          
+        case 'move':
+          // Subtle percussion for movement
+          AudioEngine.playPercussion('slitDrum', {
+            ...options, 
+            volume: soundVolume * 0.6
+          });
+          break;
+          
+        case 'select':
+          // Brief wind instrument or plucked string for selection
+          if (Math.random() > 0.4) {
+            // First parameter is frequency
+            const frequency = 350 + Math.random() * 100;
+            AudioEngine.playWindInstrument(frequency, {
+              ...options,
+              duration: 0.3
+            });
+          } else {
+            // First parameter is frequency
+            const frequency = 380 + Math.random() * 80;
+            AudioEngine.playPluckedString(frequency, {
+              ...options,
+              duration: 0.3
+            });
+          }
+          break;
+          
+        case 'unitCreated':
+        case 'unit-created': // Support both naming conventions
+          // Triumphant horn for unit creation
+          const frequency = 180 + Math.random() * 40;
+          AudioEngine.playHorn(frequency, {
+            ...options,
+            duration: 1.2
+          });
+          break;
+          
+        case 'victory':
+          // Celebratory ceremonial music for victory
+          AudioEngine.playCeremonialMusic(true, {
+            intensity: 0.8,
+            duration: 10
+          });
+          break;
+          
+        case 'defeat':
+          // Somber ceremonial music for defeat
+          AudioEngine.playCeremonialMusic(false, {
+            intensity: 0.5,
+            duration: 10
+          });
+          break;
+          
+        default:
+          console.warn(`Sound key not recognized for enhanced procedural audio: ${soundKey}`);
+          // Fall back to legacy audio utilities
+          this.playLegacyProceduralSound(soundKey);
+      }
+    }).catch(error => {
+      console.error('Failed to load enhanced Audio Engine for sound effects:', error);
+      // Fall back to legacy audio utilities if there's an error
+      this.playLegacyProceduralSound(soundKey);
+    });
+  }
+  
+  /**
+   * Play legacy procedural sounds as a fallback
+   * @param soundKey - The key of the sound to play
+   */
+  private playLegacyProceduralSound(soundKey: string): void {
+    // Use original audio utilities for backward compatibility
     switch (soundKey) {
       case 'attack':
         audioUtils.generateAttackSound();
@@ -123,7 +233,7 @@ export class SoundService {
         audioUtils.generateDefeatSound();
         break;
       default:
-        console.warn(`Sound key not recognized for procedural audio: ${soundKey}`);
+        console.warn(`Sound key not recognized for legacy procedural audio: ${soundKey}`);
     }
   }
   
@@ -246,13 +356,19 @@ export class SoundService {
       switch (musicKey) {
         case 'theme':
         case 'exploration':
-          // Play Mesoamerican exploration music
-          AudioEngine.playExplorationMusic(0.4, 30);
+          // Play Mesoamerican exploration music with moderate intensity
+          AudioEngine.playExplorationMusic({
+            intensity: 0.4,
+            duration: 30
+          });
           
           // Set up interval to periodically regenerate music for continuous background
           this.themeInterval = window.setInterval(() => {
             if (useAudio.getState().musicEnabled) {
-              AudioEngine.playExplorationMusic(0.4, 30);
+              AudioEngine.playExplorationMusic({
+                intensity: 0.4,
+                duration: 30
+              });
             }
           }, 29000) as unknown as number; // Slightly shorter than duration to avoid gaps
           break;
@@ -260,34 +376,57 @@ export class SoundService {
         case 'battle':
         case 'combat':
           // Play Mesoamerican combat music with higher intensity
-          AudioEngine.playCombatMusic(0.7, 25);
+          AudioEngine.playCombatMusic({
+            intensity: 0.7,
+            duration: 25
+          });
           
           // Set up interval for continuous battle music
           this.battleInterval = window.setInterval(() => {
             if (useAudio.getState().musicEnabled) {
-              AudioEngine.playCombatMusic(0.7, 25);
+              AudioEngine.playCombatMusic({
+                intensity: 0.7,
+                duration: 25
+              });
             }
           }, 24000) as unknown as number; // Slightly shorter than duration to avoid gaps
           break;
           
         case 'victory':
           // Play victory ceremonial music (no loop needed for victory/defeat)
-          AudioEngine.playCeremonialMusic(true, 20);
+          AudioEngine.playCeremonialMusic(true, {
+            intensity: 0.8,
+            duration: 20
+          });
           break;
           
         case 'defeat':
           // Play defeat ceremonial music (no loop needed for victory/defeat)
-          AudioEngine.playCeremonialMusic(false, 20);
+          AudioEngine.playCeremonialMusic(false, {
+            intensity: 0.4,
+            duration: 20
+          });
           break;
           
         case 'ambience':
-          // Play subtle ambient background sounds
+          // Use exploration music with low intensity for ambience if specific ambient functions aren't available
+          AudioEngine.playExplorationMusic({
+            intensity: 0.2,  // Use low intensity for ambient background
+            duration: 30
+          });
+          
+          // Also use the new ambient nature sounds if available
           AudioEngine.generateAmbientNatureSounds(30, 0.5);
           AudioEngine.generateAmbientFluteLayer(220, 30, 0.3);
           
           // Set up interval for continuous ambient sounds
           this.themeInterval = window.setInterval(() => {
             if (useAudio.getState().musicEnabled) {
+              AudioEngine.playExplorationMusic({
+                intensity: 0.2,
+                duration: 30
+              });
+              // Refresh the ambient nature sounds
               AudioEngine.generateAmbientNatureSounds(30, 0.5);
               AudioEngine.generateAmbientFluteLayer(220, 30, 0.3);
             }
@@ -295,16 +434,25 @@ export class SoundService {
           break;
           
         default:
-          // For unrecognized keys, fall back to the simple demonstration track
-          AudioEngine.playSimpleAncientTrack();
-          console.warn(`Music key not recognized for procedural audio: ${musicKey}, playing fallback track`);
+          // For unrecognized keys, fall back to the simple exploration music
+          console.log(`Using fallback music for unrecognized key: ${musicKey}`);
           
-          // Set up interval for the fallback track
+          // Use exploration music with generic settings
+          AudioEngine.playExplorationMusic({
+            intensity: 0.3,
+            duration: 20,
+            theme: 'genericAncient'
+          });
+          
           this.themeInterval = window.setInterval(() => {
             if (useAudio.getState().musicEnabled) {
-              AudioEngine.playSimpleAncientTrack();
+              AudioEngine.playExplorationMusic({
+                intensity: 0.3,
+                duration: 20,
+                theme: 'genericAncient'
+              });
             }
-          }, 10000) as unknown as number;
+          }, 19000) as unknown as number;
       }
     }).catch(error => {
       console.error('Failed to load Audio Engine for procedural music:', error);
