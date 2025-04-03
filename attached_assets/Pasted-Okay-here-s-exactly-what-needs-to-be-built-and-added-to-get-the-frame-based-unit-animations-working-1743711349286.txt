@@ -1,0 +1,26 @@
+Okay, here's exactly what needs to be built and added to get the frame-based unit animations working:
+
+Create Animation Assets (Spritesheets/Texture Atlases):
+
+Instead of the current static SVG files (like nephite-worker.svg ), you need to create image files that contain all the frames for each unit's animations. These are typically called spritesheets or texture atlases.   
+For each unit type (worker, melee, ranged) and for each faction (nephites, lamanites, etc.), you need to create these assets.
+Each spritesheet/atlas should include sequences of frames for different actions, such as:
+idle animation
+move animation (ideally covering different directions if needed for isometric view)
+attack animation
+gather animation (for workers)
+Optional: damage/hit animation, death animation.
+You'll also need corresponding data files (usually JSON) that define the position and size of each frame within the atlas, especially if using a texture atlas packer tool.
+Update Asset Loading Code:
+
+Go into the preload() function within your Phaser scene files (likely Main.ts  or potentially Boot.ts ).   
+Remove the lines that load the static SVGs for units (e.g., this.load.svg('nephite-worker', ...)).
+Add code to load the new spritesheets or texture atlases you created in Step 1.
+If using spritesheets: this.load.spritesheet('nephite-worker-anim', 'path/to/nephite-worker-spritesheet.png', { frameWidth: 64, frameHeight: 64 }); (adjust path and frame dimensions).
+If using texture atlases: this.load.atlas('nephite-worker-atlas', 'path/to/nephite-worker-atlas.png', 'path/to/nephite-worker-atlas.json'); (adjust paths).
+Make sure you use unique keys for each loaded asset (e.g., 'nephite-worker-anim', 'lamanite-melee-atlas').
+Define Animations in Phaser:
+
+In the create() method of the same Phaser scene where you loaded the assets (likely Main.ts), you need to define the actual animations using this.anims.create().
+For each animation state (idle, move, attack, etc.) of each unit, you'll create an animation definition. This tells Phaser which frames from the spritesheet/atlas belong to that specific animation and sets properties like frame rate and looping.
+Crucially, the key you give each animation must match the pattern the Unit.ts code expects: `${faction}-${type}-${animName}`.   

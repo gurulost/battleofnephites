@@ -84,10 +84,33 @@ export default class MainScene extends Phaser.Scene {
     this.load.svg('particle', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/circle.svg');
     
     // Load unit assets for all factions
+    // Keep the regular SVG unit assets for backwards compatibility
     // Nephites
     this.load.svg('nephite-worker', 'assets/images/units/nephite-worker.svg');
     this.load.svg('nephite-melee', 'assets/images/units/nephite-melee.svg');
     this.load.svg('nephite-ranged', 'assets/images/units/nephite-ranged.svg');
+    
+    // Load unit spritesheets for animations
+    console.log('Loading unit spritesheets');
+    
+    // Nephite unit spritesheets
+    this.load.atlas(
+      'nephite-worker-atlas',
+      'assets/images/units/spritesheets/nephite-worker.png',
+      'assets/images/units/spritesheets/nephite-worker.json'
+    );
+    
+    this.load.atlas(
+      'nephite-melee-atlas',
+      'assets/images/units/spritesheets/nephite-melee.png',
+      'assets/images/units/spritesheets/nephite-melee.json'
+    );
+    
+    this.load.atlas(
+      'nephite-ranged-atlas',
+      'assets/images/units/spritesheets/nephite-ranged.png',
+      'assets/images/units/spritesheets/nephite-ranged.json'
+    );
     
     // Lamanites
     this.load.svg('lamanite-worker', 'assets/images/units/lamanite-worker.svg');
@@ -108,6 +131,8 @@ export default class MainScene extends Phaser.Scene {
     this.load.svg('jaredites-worker', 'assets/images/units/jaredites-worker.svg');
     this.load.svg('jaredites-melee', 'assets/images/units/jaredites-melee.svg');
     this.load.svg('jaredites-ranged', 'assets/images/units/jaredites-ranged.svg');
+    
+    // Note: Spritesheets for Nephite units are loaded above
     
     // Load building assets for all factions
     // Nephites
@@ -163,6 +188,9 @@ export default class MainScene extends Phaser.Scene {
     // Create the isometric tilemap
     this.createMap(worldCenterX, worldCenterY);
     
+    // Create unit animations
+    this.createUnitAnimations();
+    
     // Place initial units and buildings for both players
     this.placeInitialEntities();
     
@@ -180,6 +208,78 @@ export default class MainScene extends Phaser.Scene {
     
     // Initial UI update
     this.updateUI();
+  }
+  
+  /**
+   * Create animations for unit sprites
+   */
+  createUnitAnimations() {
+    console.log('Creating unit animations');
+    
+    // Helper function to create animations for a specific unit type and faction
+    const createAnimsForUnit = (faction: string, unitType: string) => {
+      // Only create animations for spritesheet assets that are actually loaded
+      // Currently, we only have Nephite animations implemented
+      if (faction !== 'nephites') return;
+      
+      // Get the atlas key for this unit
+      const atlasKey = `${faction}-${unitType}-atlas`;
+      
+      // Idle animation
+      this.anims.create({
+        key: `${faction}-${unitType}-idle`,
+        frames: this.anims.generateFrameNames(atlasKey, { 
+          prefix: 'idle_',
+          start: 1,
+          end: 4
+        }),
+        frameRate: 5,
+        repeat: -1 // Loop indefinitely
+      });
+      
+      // Move animation
+      this.anims.create({
+        key: `${faction}-${unitType}-move`,
+        frames: this.anims.generateFrameNames(atlasKey, { 
+          prefix: 'move_',
+          start: 1,
+          end: 4
+        }),
+        frameRate: 8,
+        repeat: -1 // Loop indefinitely
+      });
+      
+      // Attack animation
+      this.anims.create({
+        key: `${faction}-${unitType}-attack`,
+        frames: this.anims.generateFrameNames(atlasKey, { 
+          prefix: 'attack_',
+          start: 1,
+          end: 4
+        }),
+        frameRate: 10,
+        repeat: 0 // Play once
+      });
+      
+      // Gather animation (only for worker unit)
+      if (unitType === 'worker') {
+        this.anims.create({
+          key: `${faction}-${unitType}-gather`,
+          frames: this.anims.generateFrameNames(atlasKey, { 
+            prefix: 'gather_',
+            start: 1,
+            end: 4
+          }),
+          frameRate: 7,
+          repeat: 1 // Play twice
+        });
+      }
+    };
+    
+    // Create animations for each unit type for the Nephites faction
+    createAnimsForUnit('nephites', 'worker');
+    createAnimsForUnit('nephites', 'melee');
+    createAnimsForUnit('nephites', 'ranged');
   }
   
   /**

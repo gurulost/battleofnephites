@@ -94,8 +94,19 @@ export default class Unit extends Phaser.GameObjects.Container {
       faction = playerEntity.faction;
     }
     
-    // Use faction-specific unit sprites with animation support
-    const sprite = scene.add.sprite(0, 0, `${faction}-${type}`);
+    // Check if we have a spritesheet atlas for this unit type and faction
+    const atlasKey = `${faction}-${type}-atlas`;
+    let sprite;
+    
+    // Use spritesheet if available, otherwise fall back to static SVG
+    if (scene.textures.exists(atlasKey)) {
+      console.log(`Using spritesheet for ${faction}-${type}`);
+      sprite = scene.add.sprite(0, 0, atlasKey, 'idle_1');
+    } else {
+      console.log(`Using static image for ${faction}-${type}`);
+      sprite = scene.add.sprite(0, 0, `${faction}-${type}`);
+    }
+    
     this.sprite = sprite;
     
     // Set origin to bottom-center for isometric positioning
@@ -635,8 +646,9 @@ export default class Unit extends Phaser.GameObjects.Container {
   /**
    * Play the appropriate animation based on state
    * @param animName The name of the animation to play
+   * @param onComplete Optional callback to run when the animation completes
    */
-  playAnimation(animName: string) {
+  playAnimation(animName: string, onComplete?: () => void) {
     // Only change animation if it's different from current
     if (this.currentAnimation === animName) return;
     
@@ -645,8 +657,22 @@ export default class Unit extends Phaser.GameObjects.Container {
     
     // Check if animation exists before playing
     if (this.scene.anims.exists(animKey)) {
+      console.log(`Playing animation: ${animKey}`);
+      
+      // Set up completion callback if provided
+      if (onComplete) {
+        this.sprite.once('animationcomplete', onComplete);
+      }
+      
+      // Play the animation
       this.sprite.play(animKey);
       this.currentAnimation = animName;
+    } else {
+      console.log(`Animation not found: ${animKey}, using static sprite`);
+      // If animation doesn't exist but we have a completion callback, call it
+      if (onComplete) {
+        onComplete();
+      }
     }
   }
   
@@ -664,25 +690,39 @@ export default class Unit extends Phaser.GameObjects.Container {
   
   /**
    * Set unit state and trigger appropriate animations
+   * @param newState The new state of the unit
+   * @param onAnimationComplete Optional callback when animation completes
    */
-  setUnitState(newState: string) {
+  setUnitState(newState: string, onAnimationComplete?: () => void) {
     const oldState = this.state;
     this.state = newState;
     
     // Trigger animation changes based on state
     switch (newState) {
       case 'moving':
-        this.playAnimation('move');
+        this.playAnimation('move', onAnimationComplete);
         break;
       case 'attacking':
-        this.playAnimation('attack');
+        this.playAnimation('attack', () => {
+          // After attack animation completes, units should return to idle state
+          // Only if they're still in attacking state
+          if (this.state === 'attacking' && onAnimationComplete) {
+            onAnimationComplete();
+          }
+        });
         break;
       case 'gathering':
-        this.playAnimation('gather');
+        this.playAnimation('gather', () => {
+          // After gather animation completes, units should return to idle state
+          // Only if they're still in gathering state
+          if (this.state === 'gathering' && onAnimationComplete) {
+            onAnimationComplete();
+          }
+        });
         break;
       case 'idle':
       default:
-        this.playAnimation('idle');
+        this.playAnimation('idle', onAnimationComplete);
         break;
     }
   }
