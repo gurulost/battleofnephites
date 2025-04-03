@@ -476,8 +476,8 @@ export default class MainScene extends Phaser.Scene {
         this.createBuilding('city', startX, startY, player.id, `city${i + 1}`);
         
         // Create player's starting worker near city
-        // Try to find an empty adjacent tile
-        const adjacentTiles = this.getAdjacentTiles(startX, startY);
+        // Try to find an empty adjacent tile (use orthogonal adjacency for cleaner initial unit placement)
+        const adjacentTiles = this.getAdjacentTiles(startX, startY, false);
         let workerPos = { x: startX + 1, y: startY }; // Default position
         
         for (const tile of adjacentTiles) {
@@ -1264,9 +1264,10 @@ export default class MainScene extends Phaser.Scene {
       } 
       // If friendly entity, do nothing (or implement special actions later)
     } else if (unit.type === 'worker' && this.canGatherFromTile(targetX, targetY)) {
-      // Worker gathering resources
-      if (this.isAdjacentTile(unit.gridX, unit.gridY, targetX, targetY)) {
-        // If worker is adjacent to the resource tile, gather immediately
+      // Worker gathering resources - check orthogonal and diagonal adjacency
+      if (this.isAdjacentTile(unit.gridX, unit.gridY, targetX, targetY, true)) {
+        // If worker is adjacent to the resource tile (including diagonals), gather immediately
+        // This makes gathering feel more natural on an isometric grid
         this.gatherResource(unit, targetX, targetY);
       } else if (unit.movesLeft > 0) {
         // If not adjacent, try to move there first
@@ -1284,15 +1285,40 @@ export default class MainScene extends Phaser.Scene {
    * Checks if a tile has resources that can be gathered
    */
   canGatherFromTile(x: number, y: number): boolean {
-    if (!this.isValidTile(x, y)) return false;
+    // Check if the tile is valid and exists on the map
+    if (!this.isValidTile(x, y)) {
+      console.log(`Invalid tile position (${x},${y})`);
+      return false;
+    }
     
     const tile = this.tiles[y][x];
-    if (!tile) return false;
+    if (!tile) {
+      console.log(`Tile not found at (${x},${y})`);
+      return false;
+    }
     
+    // Get the tile type (grass, forest, hill, etc.)
     const tileType = tile.getData('tileType');
     
+    // Check if this is a resource tile type
     // Resource tiles are grass (food), forest (production), and hill (production)
-    return tileType === 'grass' || tileType === 'forest' || tileType === 'hill';
+    const isResourceTile = tileType === 'grass' || tileType === 'forest' || tileType === 'hill';
+    
+    if (!isResourceTile) {
+      return false;
+    }
+    
+    // If resources have been explicitly tracked on this tile, check if depleted
+    if (tile.getData('resourcesLeft') !== undefined) {
+      const resourcesLeft = tile.getData('resourcesLeft');
+      
+      // If depleted (resourcesLeft <= 0), tile is no longer gatherable
+      if (resourcesLeft <= 0) {
+        return false;
+      }
+    }
+    
+    return true;
   }
   
   /**
@@ -1332,10 +1358,19 @@ export default class MainScene extends Phaser.Scene {
   /**
    * Checks if two tiles are adjacent
    */
-  isAdjacentTile(x1: number, y1: number, x2: number, y2: number): boolean {
+  isAdjacentTile(x1: number, y1: number, x2: number, y2: number, includeDiagonals: boolean = false): boolean {
+    // Get the absolute difference between coordinates
     const dx = Math.abs(x1 - x2);
     const dy = Math.abs(y1 - y2);
-    return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+    
+    if (includeDiagonals) {
+      // For diagonal adjacency, both dx and dy must be at most 1
+      // This includes the 8 tiles surrounding the center tile
+      return dx <= 1 && dy <= 1 && !(dx === 0 && dy === 0);
+    } else {
+      // For orthogonal adjacency (N, S, E, W only)
+      return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+    }
   }
   
   /**
@@ -1348,8 +1383,8 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
-    // Find a path to an adjacent tile
-    const adjacentTiles = this.getAdjacentTiles(targetX, targetY);
+    // Find a path to an adjacent tile (including diagonals for more natural movement)
+    const adjacentTiles = this.getAdjacentTiles(targetX, targetY, true);
     let bestTile = null;
     let shortestPath = null;
     
@@ -1457,11 +1492,24 @@ export default class MainScene extends Phaser.Scene {
     // Check if in range (adjacent for melee, 2 tiles for ranged)
     const dx = Math.abs(attacker.gridX - defender.gridX);
     const dy = Math.abs(attacker.gridY - defender.gridY);
-    const distance = dx + dy;
     
+    // Use consistent range calculation
+    // For melee units: adjacent tiles only (including diagonals)
+    // For ranged units: within 2 tiles in any direction
     const attackRange = attacker.type === 'ranged' ? 2 : 1;
     
-    if (distance > attackRange) {
+    // Using Euclidean distance for more natural circular range
+    // But squared to avoid costly sqrt calculation
+    const distanceSquared = dx * dx + dy * dy;
+    const rangeSquared = attackRange * attackRange;
+    
+    // Also check Manhattan distance for better gameplay feeling on grid
+    const manhattanDistance = dx + dy;
+    const manhattanRangeThreshold = attacker.type === 'ranged' ? 3 : 1;
+    
+    // Use both checks for a more natural feeling range
+    // Either must be within the euclidean radius OR must be within manhattan distance
+    if (distanceSquared > rangeSquared && manhattanDistance > manhattanRangeThreshold) {
       console.log("Target out of attack range");
       return;
     }
@@ -2113,7 +2161,10 @@ export default class MainScene extends Phaser.Scene {
     
     // Check if the tile has resources
     const tile = this.tiles[targetY][targetX];
-    if (!tile) return;
+    if (!tile) {
+      console.log("Invalid tile for resource gathering");
+      return;
+    }
     
     // Validate that it's a proper resource tile
     const tileType = tile.getData('tileType');
@@ -2122,8 +2173,19 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
+    // Ensure the resourcesLeft property is properly initialized if not present
+    if (tile.getData('resourcesLeft') === undefined) {
+      // Default starting resources based on tile type
+      let defaultResources = 5;
+      if (tileType === 'forest') defaultResources = 6;
+      if (tileType === 'hill') defaultResources = 4;
+      
+      tile.setData('resourcesLeft', defaultResources);
+      console.log(`Initialized resources for ${tileType} tile: ${defaultResources}`);
+    }
+    
     // Check if tile has any resources left
-    const resourcesLeft = tile.getData('resourcesLeft') || 0;
+    const resourcesLeft = tile.getData('resourcesLeft');
     if (resourcesLeft <= 0) {
       console.log(`This ${tileType} tile has been depleted of resources`);
       
@@ -2297,8 +2359,8 @@ export default class MainScene extends Phaser.Scene {
         // Check if a unit was produced
         const producedUnit = building.getProducedUnit();
         if (producedUnit) {
-          // Find an empty adjacent tile for the new unit
-          const adjacentTiles = this.getAdjacentTiles(building.gridX, building.gridY);
+          // Find an empty adjacent tile for the new unit (include diagonals for more placement options)
+          const adjacentTiles = this.getAdjacentTiles(building.gridX, building.gridY, true);
           const emptyTile = adjacentTiles.find(tile => 
             !this.getEntityAtTile(tile.x, tile.y) && this.pathFinder.isWalkableAt(tile.x, tile.y)
           );
@@ -2452,13 +2514,23 @@ export default class MainScene extends Phaser.Scene {
     return true;
   }
   
-  getAdjacentTiles(x: number, y: number) {
-    const adjacent = [
-      { x: x+1, y },
-      { x: x-1, y },
-      { x, y: y+1 },
-      { x, y: y-1 }
+  getAdjacentTiles(x: number, y: number, includeDiagonals: boolean = false) {
+    let adjacent = [
+      { x: x+1, y },     // East
+      { x: x-1, y },     // West
+      { x, y: y+1 },     // South
+      { x, y: y-1 }      // North
     ];
+    
+    // Add diagonal tiles if requested
+    if (includeDiagonals) {
+      adjacent = adjacent.concat([
+        { x: x+1, y: y+1 }, // Southeast
+        { x: x+1, y: y-1 }, // Northeast
+        { x: x-1, y: y+1 }, // Southwest
+        { x: x-1, y: y-1 }  // Northwest
+      ]);
+    }
     
     // Filter to only include tiles within map bounds
     return adjacent.filter(tile => 

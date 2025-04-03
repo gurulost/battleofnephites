@@ -202,34 +202,27 @@ export class FogOfWar {
    * Uses a recursive shadowcasting-inspired approach adapted for a grid
    */
   private calculateFieldOfView(sourceX: number, sourceY: number, range: number) {
-    // Divide the FOV calculation into octants for efficiency
-    for (let octant = 0; octant < 8; octant++) {
-      this.calculateOctant(sourceX, sourceY, range, octant);
-    }
-  }
-  
-  /**
-   * Calculate field of view in a specific octant
-   */
-  private calculateOctant(sourceX: number, sourceY: number, range: number, octant: number) {
-    // For simplicity, we'll just do a circular check with line-of-sight test
-    // In a full implementation, you'd use proper shadowcasting
+    // Mark the source position as visible
+    this.currentVisibility[sourceY][sourceX] = true;
     
-    for (let r = 1; r <= range; r++) {
-      for (let x = -r; x <= r; x++) {
-        for (let y = -r; y <= r; y++) {
-          // Skip if outside the circle of the sight range
-          if (x*x + y*y > range*range) continue;
-          
-          const nx = sourceX + x;
-          const ny = sourceY + y;
-          
-          // Check if tile is within map bounds
-          if (nx >= 0 && nx < this.mapWidth && ny >= 0 && ny < this.mapHeight) {
-            // Check if there's a clear line of sight
-            if (this.hasLineOfSight(sourceX, sourceY, nx, ny)) {
-              this.currentVisibility[ny][nx] = true;
-            }
+    // Use an optimized approach that only checks tiles within range
+    // and uses early termination for line-of-sight tests
+    for (let y = Math.max(0, sourceY - range); y <= Math.min(this.mapHeight - 1, sourceY + range); y++) {
+      for (let x = Math.max(0, sourceX - range); x <= Math.min(this.mapWidth - 1, sourceX + range); x++) {
+        // Skip the source tile
+        if (x === sourceX && y === sourceY) continue;
+        
+        // Use Euclidean distance for more natural circular vision
+        const dx = x - sourceX;
+        const dy = y - sourceY;
+        const distanceSquared = dx * dx + dy * dy;
+        
+        // Only check tiles within range using squared distance for efficiency
+        // (avoids costly square root calculations)
+        if (distanceSquared <= range * range) {
+          // Check line of sight using optimized Bresenham's algorithm
+          if (this.hasLineOfSight(sourceX, sourceY, x, y)) {
+            this.currentVisibility[y][x] = true;
           }
         }
       }
@@ -241,7 +234,13 @@ export class FogOfWar {
    * Uses Bresenham's line algorithm to check for blocking tiles
    */
   private hasLineOfSight(x0: number, y0: number, x1: number, y1: number): boolean {
-    // Simple direct line-of-sight check
+    // Improved Bresenham's line algorithm with better handling of edge cases
+    
+    // Early return for adjacent tiles (always visible)
+    if (Math.abs(x1 - x0) <= 1 && Math.abs(y1 - y0) <= 1) {
+      return true;
+    }
+    
     const dx = Math.abs(x1 - x0);
     const dy = Math.abs(y1 - y0);
     const sx = x0 < x1 ? 1 : -1;
@@ -251,18 +250,11 @@ export class FogOfWar {
     let x = x0;
     let y = y0;
     
+    // Track the last tile we checked to avoid redundant checks
+    let lastX = x0;
+    let lastY = y0;
+    
     while (x !== x1 || y !== y1) {
-      // Skip the source and destination
-      if (x !== x0 || y !== y0) {
-        if (x !== x1 || y !== y1) {
-          // Check if this is a blocking tile (e.g., a hill)
-          const tile = this.getTileAt(x, y);
-          if (tile && this.isTileBlockingLineOfSight(tile)) {
-            return false; // Line of sight is blocked
-          }
-        }
-      }
-      
       const e2 = 2 * err;
       if (e2 > -dy) {
         err -= dy;
@@ -271,6 +263,21 @@ export class FogOfWar {
       if (e2 < dx) {
         err += dx;
         y += sy;
+      }
+      
+      // Skip the source and destination
+      if ((x !== x0 || y !== y0) && (x !== x1 || y !== y1)) {
+        // Only check each tile once (in case of diagonals)
+        if (x !== lastX || y !== lastY) {
+          // Check if this is a blocking tile (e.g., a hill)
+          const tile = this.getTileAt(x, y);
+          if (tile && this.isTileBlockingLineOfSight(tile)) {
+            return false; // Line of sight is blocked
+          }
+          
+          lastX = x;
+          lastY = y;
+        }
       }
     }
     
