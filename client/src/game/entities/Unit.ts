@@ -273,92 +273,176 @@ export default class Unit extends Phaser.GameObjects.Container {
     const moveX = dx / distance * 20;
     const moveY = dy / distance * 20;
     
-    // Show attack icon
+    // Show attack icon with pulse effect
     const attackIcon = this.scene.add.image(0, -40, 'attack-indicator');
     attackIcon.setScale(0.6);
     attackIcon.setTint(0xff0000);
     this.add(attackIcon);
     
-    // Fade and scale up then remove the indicator
+    // Pulse the attack icon for better visibility
     this.scene.tweens.add({
       targets: attackIcon,
-      alpha: 0,
-      scale: 1,
-      y: -60,
-      duration: 800,
-      onComplete: () => {
-        attackIcon.destroy();
-      }
-    });
-    
-    // Flash the unit sprite to indicate attack
-    this.scene.tweens.add({
-      targets: this.sprite,
-      alpha: 0.7,
-      duration: 50,
-      yoyo: true,
-      repeat: 1
-    });
-    
-    // Tween forward then back (lunge attack)
-    this.scene.tweens.add({
-      targets: this,
-      x: startX + moveX,
-      y: startY + moveY,
-      duration: 100,
+      scale: 0.8,
+      duration: 150,
       yoyo: true,
       repeat: 1,
       onComplete: () => {
-        // After attacking, add slash effect at target position
-        if (this.type !== 'ranged') {
-          // For melee units, add slash effect
-          this.createMeleeImpactEffect(targetScreenX, targetScreenY);
-        } else {
-          // For ranged units, add projectile effect
-          this.createRangedAttackEffect(startX, startY, targetScreenX, targetScreenY);
-        }
+        // After pulsing, fade and move upward
+        this.scene.tweens.add({
+          targets: attackIcon,
+          alpha: 0,
+          scale: 1,
+          y: -60,
+          duration: 600,
+          onComplete: () => {
+            attackIcon.destroy();
+          }
+        });
+      }
+    });
+    
+    // Pre-attack anticipation (slight pullback)
+    this.scene.tweens.add({
+      targets: this,
+      x: startX - moveX * 0.3,
+      y: startY - moveY * 0.3,
+      duration: 100,
+      onComplete: () => {
+        // Flash the unit sprite to indicate attack
+        this.scene.tweens.add({
+          targets: this.sprite,
+          alpha: 0.7,
+          duration: 50,
+          yoyo: true,
+          repeat: 1
+        });
+        
+        // Forward lunge attack
+        this.scene.tweens.add({
+          targets: this,
+          x: startX + moveX * 1.2,
+          y: startY + moveY * 1.2,
+          duration: 150,
+          ease: 'Power1',
+          onComplete: () => {
+            // After attacking, add effect at target position
+            if (this.type !== 'ranged') {
+              // For melee units, add slash effect
+              this.createMeleeImpactEffect(targetScreenX, targetScreenY);
+            } else {
+              // For ranged units, add projectile effect
+              this.createRangedAttackEffect(startX, startY, targetScreenX, targetScreenY);
+            }
+            
+            // Return to original position
+            this.scene.tweens.add({
+              targets: this,
+              x: startX,
+              y: startY,
+              duration: 250,
+              ease: 'Power1'
+            });
+          }
+        });
       }
     });
   }
   
   createMeleeImpactEffect(targetX: number, targetY: number) {
-    // Create slash effect at target position
-    const slash = this.scene.add.graphics();
-    slash.x = targetX - this.x;
-    slash.y = targetY - this.y - 30;
-    this.add(slash);
+    // Create container for slash effects at target position
+    const effectContainer = this.scene.add.container(targetX, targetY - 30);
     
-    // Draw slash
-    slash.lineStyle(3, 0xff0000, 1);
+    // Create primary slash effect
+    const slash = this.scene.add.graphics();
+    
+    // Draw primary slash (X shape)
+    slash.lineStyle(4, 0xff3333, 1);
     slash.beginPath();
-    slash.moveTo(-10, -10);
-    slash.lineTo(10, 10);
-    slash.moveTo(10, -10);
-    slash.lineTo(-10, 10);
+    slash.moveTo(-15, -15);
+    slash.lineTo(15, 15);
+    slash.moveTo(15, -15);
+    slash.lineTo(-15, 15);
     slash.closePath();
     slash.strokePath();
     
-    // Fade out and destroy
+    // Create secondary slash for more impact
+    const secondarySlash = this.scene.add.graphics();
+    secondarySlash.lineStyle(3, 0xffff00, 0.8);
+    
+    // Draw diagonal lines
+    secondarySlash.beginPath();
+    secondarySlash.moveTo(-10, 0);
+    secondarySlash.lineTo(10, 0);
+    secondarySlash.moveTo(0, -10);
+    secondarySlash.lineTo(0, 10);
+    secondarySlash.closePath();
+    secondarySlash.strokePath();
+    
+    // Add both effects to container
+    effectContainer.add([slash, secondarySlash]);
+    
+    // Add small particles around the impact
+    const particles = this.scene.add.particles(0, 0, 'particle', {
+      x: targetX,
+      y: targetY - 20,
+      speed: { min: 15, max: 30 },
+      scale: { start: 0.4, end: 0 },
+      quantity: 5,
+      lifespan: 300,
+      tint: 0xff3333
+    });
+    
+    // Scale slash for impact effect
     this.scene.tweens.add({
       targets: slash,
-      alpha: 0,
-      duration: 300,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 100,
+      yoyo: true,
       onComplete: () => {
-        slash.destroy();
+        // Rotate and fade out the secondary slash
+        this.scene.tweens.add({
+          targets: secondarySlash,
+          rotation: 0.3,
+          alpha: 0,
+          duration: 200,
+        });
+        
+        // Fade out the primary slash
+        this.scene.tweens.add({
+          targets: slash,
+          alpha: 0,
+          duration: 300,
+          onComplete: () => {
+            effectContainer.destroy();
+          }
+        });
       }
+    });
+    
+    // Cleanup particles after they finish
+    this.scene.time.delayedCall(400, () => {
+      particles.destroy();
     });
   }
   
   createRangedAttackEffect(startX: number, startY: number, targetX: number, targetY: number) {
-    // Create projectile
-    const projectile = this.scene.add.graphics();
-    projectile.x = 0;
-    projectile.y = -20;
-    this.add(projectile);
+    // Create projectile with container to handle multiple visual elements
+    const projectileContainer = this.scene.add.container(0, -20);
+    this.add(projectileContainer);
     
-    // Draw projectile
-    projectile.fillStyle(0xff0000, 1);
-    projectile.fillCircle(0, 0, 5);
+    // Create main projectile graphic
+    const projectile = this.scene.add.graphics();
+    projectile.fillStyle(0xff3333, 1);
+    projectile.fillCircle(0, 0, 6);
+    
+    // Add a glow/trail effect
+    const glow = this.scene.add.graphics();
+    glow.fillStyle(0xff9933, 0.6);
+    glow.fillCircle(0, 0, 9);
+    
+    // Add both to the container
+    projectileContainer.add([glow, projectile]);
     
     // Calculate direction vector
     const dx = targetX - startX;
@@ -373,32 +457,89 @@ export default class Unit extends Phaser.GameObjects.Container {
     const targetLocalX = ndx * 50;
     const targetLocalY = ndy * 50 - 20; // -20 to account for projectile's y offset
     
-    // Animate projectile
+    // Create trail particles that follow the projectile
+    const particles = this.scene.add.particles(startX, startY - 20, 'particle', {
+      follow: projectileContainer,
+      followOffset: { x: -2 * ndx, y: -2 * ndy },
+      scale: { start: 0.3, end: 0 },
+      speed: 10,
+      lifespan: 200,
+      quantity: 2,
+      frequency: 30,
+      tint: 0xff7700
+    });
+    
+    // Pulse the glow effect
     this.scene.tweens.add({
-      targets: projectile,
+      targets: glow,
+      alpha: 0.3,
+      duration: 100,
+      yoyo: true,
+      repeat: -1
+    });
+    
+    // Animate projectile movement
+    this.scene.tweens.add({
+      targets: projectileContainer,
       x: targetLocalX,
       y: targetLocalY,
-      duration: 200,
+      duration: 300,
+      ease: 'Power1',
       onComplete: () => {
+        // Stop the particles
+        particles.destroy();
+        
         // Create impact effect at end position
+        const impactContainer = this.scene.add.container(targetX, targetY - 30);
+        
+        // Create main impact graphic
         const impact = this.scene.add.graphics();
-        impact.x = targetX - this.x;
-        impact.y = targetY - this.y - 30;
-        this.add(impact);
+        impact.fillStyle(0xff3333, 0.8);
+        impact.fillCircle(0, 0, 12);
         
-        // Draw impact
-        impact.fillStyle(0xff0000, 0.7);
-        impact.fillCircle(0, 0, 10);
+        // Create impact ring
+        const ring = this.scene.add.graphics();
+        ring.lineStyle(2, 0xff9933, 0.7);
+        ring.strokeCircle(0, 0, 15);
         
-        // Fade out and destroy
+        // Add both to container
+        impactContainer.add([impact, ring]);
+        
+        // Add impact particles
+        const impactParticles = this.scene.add.particles(targetX, targetY - 20, 'particle', {
+          speed: { min: 20, max: 40 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 0.4, end: 0 },
+          lifespan: 300,
+          quantity: 8,
+          tint: 0xff3333
+        });
+        
+        // Expand and fade impact
         this.scene.tweens.add({
-          targets: [projectile, impact],
+          targets: impact,
+          scaleX: 1.5,
+          scaleY: 1.5,
           alpha: 0,
-          duration: 200,
+          duration: 300
+        });
+        
+        // Expand ring
+        this.scene.tweens.add({
+          targets: ring,
+          scaleX: 2,
+          scaleY: 2,
+          alpha: 0,
+          duration: 400,
           onComplete: () => {
-            projectile.destroy();
-            impact.destroy();
+            impactContainer.destroy();
+            projectileContainer.destroy();
           }
+        });
+        
+        // Cleanup impact particles
+        this.scene.time.delayedCall(400, () => {
+          impactParticles.destroy();
         });
       }
     });

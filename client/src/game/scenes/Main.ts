@@ -1528,6 +1528,7 @@ export default class MainScene extends Phaser.Scene {
   
   /**
    * Show floating damage text at the specified grid position
+   * with enhanced visual feedback
    */
   showDamageText(gridX: number, gridY: number, damage: number) {
     // Convert grid position to screen coordinates
@@ -1544,26 +1545,80 @@ export default class MainScene extends Phaser.Scene {
     const x = centerX + screenX - mapWidth / 2;
     const y = centerY + screenY - mapHeight / 2;
     
-    // Create the damage text
-    const damageText = this.add.text(x, y - 50, `-${damage}`, {
+    // Create a container for damage text and background
+    const damageContainer = this.add.container(x, y - 50);
+    
+    // Add background for better visibility
+    const bgPadding = 6;
+    const textBg = this.add.graphics();
+    textBg.fillStyle(0x000000, 0.7);
+    
+    // Create the damage text with enhanced styling
+    const damageText = this.add.text(0, 0, `-${damage}`, {
       fontFamily: 'Arial',
-      fontSize: '24px',
-      color: '#ff0000',
+      fontSize: '28px',
+      color: '#ff3333',
       stroke: '#000000',
-      strokeThickness: 4,
+      strokeThickness: 5,
+      fontStyle: 'bold',
       align: 'center'
     });
     damageText.setOrigin(0.5, 0.5);
     
-    // Animate the text
+    // Calculate the background size based on text bounds
+    const textBounds = damageText.getBounds();
+    textBg.fillRect(
+      textBounds.x - bgPadding, 
+      textBounds.y - bgPadding, 
+      textBounds.width + bgPadding * 2, 
+      textBounds.height + bgPadding * 2
+    );
+    
+    // Make background rounded by drawing circle at corners
+    const cornerRadius = 4;
+    textBg.fillCircle(textBounds.x - bgPadding, textBounds.y - bgPadding, cornerRadius);
+    textBg.fillCircle(textBounds.x + textBounds.width + bgPadding, textBounds.y - bgPadding, cornerRadius);
+    textBg.fillCircle(textBounds.x - bgPadding, textBounds.y + textBounds.height + bgPadding, cornerRadius);
+    textBg.fillCircle(textBounds.x + textBounds.width + bgPadding, textBounds.y + textBounds.height + bgPadding, cornerRadius);
+    
+    // Add both to container (background first, then text)
+    damageContainer.add([textBg, damageText]);
+    
+    // Initial animation - scale up quickly for impact
     this.tweens.add({
-      targets: damageText,
-      y: y - 80,
-      alpha: 0,
-      duration: 1000,
+      targets: damageContainer,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 150,
+      yoyo: true,
       onComplete: () => {
-        damageText.destroy();
+        // After impact, float upward and fade out
+        this.tweens.add({
+          targets: damageContainer,
+          y: y - 100,
+          alpha: 0,
+          duration: 800,
+          ease: 'Power1',
+          onComplete: () => {
+            damageContainer.destroy();
+          }
+        });
       }
+    });
+    
+    // Add small damage particles around the text for additional impact
+    const particles = this.add.particles(x, y - 40, 'particle', {
+      speed: { min: 10, max: 20 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.3, end: 0 },
+      lifespan: 400,
+      quantity: 5,
+      tint: 0xff3333
+    });
+    
+    // Cleanup particles after animation completes
+    this.time.delayedCall(500, () => {
+      particles.destroy();
     });
   }
   
@@ -1578,65 +1633,218 @@ export default class MainScene extends Phaser.Scene {
     
     // Create death animation effect
     if (isUnit) {
-      // Play death sound
-      this.soundService.playSound('unitDestroyed');
-      
-      // Create death particles effect for unit
-      const particles = this.add.particles(0, 0, 'particle', {
-        x: entityX,
-        y: entityY,
-        speed: { min: 20, max: 50 },
-        angle: { min: 0, max: 360 },
-        scale: { start: 0.6, end: 0 },
-        lifespan: 800,
-        quantity: 15,
-        tint: 0xff0000
+      // Play death sound with delay to match visuals
+      this.time.delayedCall(100, () => {
+        this.soundService.playSound('unitDestroyed');
       });
       
-      // Auto-destroy particles after animation completes
-      this.time.delayedCall(800, () => {
-        particles.destroy();
+      // Initial flash effect - use the whole unit container instead of the sprite
+      this.tweens.add({
+        targets: entity,
+        alpha: 0.3,
+        yoyo: true,
+        duration: 50,
+        repeat: 1,
+        onComplete: () => {
+          // Create death particles effect for unit with multicolor effect based on unit type
+          let particleTint = 0xff0000; // Default red
+          
+          // Different colors for different unit types
+          if (entity.type === 'melee') {
+            particleTint = 0xff3333; // Red for melee
+          } else if (entity.type === 'ranged') {
+            particleTint = 0x3333ff; // Blue for ranged
+          } else if (entity.type === 'worker') {
+            particleTint = 0xffcc33; // Gold for workers
+          }
+          
+          // First burst of particles
+          const primaryParticles = this.add.particles(0, 0, 'particle', {
+            x: entityX,
+            y: entityY - 20,
+            speed: { min: 30, max: 80 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.8, end: 0 },
+            lifespan: 800,
+            quantity: 15,
+            tint: particleTint
+          });
+          
+          // Secondary particles (smaller, different color)
+          const secondaryParticles = this.add.particles(0, 0, 'particle', {
+            x: entityX,
+            y: entityY - 15,
+            speed: { min: 15, max: 40 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.4, end: 0 },
+            lifespan: 1000,
+            quantity: 10,
+            frequency: 100,
+            tint: 0xffffff // White particles mixed in
+          });
+          
+          // Auto-destroy particles after animation completes
+          this.time.delayedCall(800, () => {
+            primaryParticles.destroy();
+          });
+          
+          this.time.delayedCall(1000, () => {
+            secondaryParticles.destroy();
+          });
+        }
       });
       
-      // Add a "defeated" text that fades up
-      const defeatText = this.add.text(entityX, entityY - 20, 'Defeated!', {
+      // Add a "defeated" text with background
+      const textContainer = this.add.container(entityX, entityY - 20);
+      
+      // Create text background
+      const textBg = this.add.graphics();
+      textBg.fillStyle(0x000000, 0.7);
+      
+      // Create text
+      const defeatText = this.add.text(0, 0, 'Defeated!', {
         fontFamily: 'Arial',
-        fontSize: '16px',
-        color: '#ff0000',
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ff3333',
         stroke: '#000000',
-        strokeThickness: 3
+        strokeThickness: 3,
+        align: 'center'
       });
       defeatText.setOrigin(0.5, 0.5);
       
-      // Animate the text
+      // Calculate background dimensions
+      const padding = 8;
+      const bounds = defeatText.getBounds();
+      
+      // Draw rounded rectangle background
+      textBg.fillRoundedRect(
+        bounds.x - padding,
+        bounds.y - padding,
+        bounds.width + padding * 2,
+        bounds.height + padding * 2,
+        4
+      );
+      
+      // Add elements to container
+      textContainer.add([textBg, defeatText]);
+      
+      // Add scale up effect before floating animation
       this.tweens.add({
-        targets: defeatText,
-        y: entityY - 60,
-        alpha: 0,
-        duration: 1000,
+        targets: textContainer,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 200,
+        delay: 400, // Slightly delayed from particle effects
+        yoyo: true,
         onComplete: () => {
-          defeatText.destroy();
+          // Animate the text upward and fade out
+          this.tweens.add({
+            targets: textContainer,
+            y: entityY - 80,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+              textContainer.destroy();
+            }
+          });
         }
       });
     } else {
-      // For buildings, create a "collapse" effect
+      // For buildings, create a more dramatic "collapse" effect
       this.soundService.playSound('buildingDestroyed');
       
-      // Create smoke/dust particles
-      const particles = this.add.particles(0, 0, 'particle', {
+      // First create ground shake effect
+      this.cameras.main.shake(300, 0.01);
+      
+      // Create a series of particle effects for more dramatic building destruction
+      
+      // Debris particles (larger, building color)
+      const debrisParticles = this.add.particles(0, 0, 'particle', {
         x: entityX,
-        y: entityY,
-        speed: { min: 10, max: 30 },
-        angle: { min: 0, max: 360 },
-        scale: { start: 1, end: 0 },
-        lifespan: 1200,
-        quantity: 25,
-        tint: 0x888888
+        y: entityY - 20,
+        speed: { min: 20, max: 60 },
+        angle: { min: 220, max: 320 }, // Mostly downward
+        scale: { start: 1.2, end: 0.2 },
+        lifespan: 1000,
+        quantity: 15,
+        tint: 0xdddddd // Brick/stone color
+      });
+      
+      // Dust cloud (smoky effect)
+      const dustParticles = this.add.particles(0, 0, 'particle', {
+        x: entityX,
+        y: entityY - 10,
+        speed: { min: 5, max: 25 },
+        angle: { min: 180, max: 360 },
+        scale: { start: 1.5, end: 0 },
+        alpha: { start: 0.6, end: 0 },
+        lifespan: 1500,
+        quantity: 20,
+        frequency: 100,
+        tint: 0xaaaaaa // Grey dust
+      });
+      
+      // Fire embers (for dramatic effect)
+      const emberParticles = this.add.particles(0, 0, 'particle', {
+        x: entityX,
+        y: entityY - 30,
+        speed: { min: 30, max: 70 },
+        angle: { min: 230, max: 310 },
+        scale: { start: 0.5, end: 0 },
+        lifespan: 800,
+        quantity: 10,
+        frequency: 80,
+        tint: 0xff6600 // Orange embers
       });
       
       // Auto-destroy particles after animation completes
-      this.time.delayedCall(1200, () => {
-        particles.destroy();
+      this.time.delayedCall(1000, () => {
+        debrisParticles.destroy();
+      });
+      
+      this.time.delayedCall(1500, () => {
+        dustParticles.destroy();
+      });
+      
+      this.time.delayedCall(800, () => {
+        emberParticles.destroy();
+      });
+      
+      // Add a "destroyed" text for buildings
+      const destroyedText = this.add.text(entityX, entityY - 30, 'Structure Destroyed!', {
+        fontFamily: 'Arial',
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ff6600',
+        stroke: '#000000',
+        strokeThickness: 4,
+        align: 'center'
+      });
+      destroyedText.setOrigin(0.5, 0.5);
+      
+      // Animate the text with initial pulse
+      this.tweens.add({
+        targets: destroyedText,
+        scaleX: 1.3,
+        scaleY: 1.3,
+        duration: 200,
+        delay: 300,
+        yoyo: true,
+        onComplete: () => {
+          // Float upward and fade
+          this.tweens.add({
+            targets: destroyedText,
+            y: entityY - 90,
+            alpha: 0,
+            duration: 1200,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+              destroyedText.destroy();
+            }
+          });
+        }
       });
     }
     

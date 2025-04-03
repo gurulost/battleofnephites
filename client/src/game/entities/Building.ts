@@ -147,14 +147,67 @@ export default class Building extends Phaser.GameObjects.Container {
     this.health -= amount;
     this.updateHealthBar();
     
-    // Flash red when taking damage
+    // Enhanced damage feedback with multiple visual indicators
+    
+    // 1. Flash red with more intensity when taking damage
     this.scene.tweens.add({
       targets: this.sprite,
-      alpha: 0.5,
+      alpha: 0.3,
       yoyo: true,
-      duration: 100,
-      repeat: 1
+      duration: 80,
+      repeat: 2
     });
+    
+    // 2. Add a brief shake effect
+    const originalX = this.x;
+    const originalY = this.y;
+    const shakeIntensity = 3;
+    
+    // First part of shake
+    this.scene.tweens.add({
+      targets: this,
+      x: originalX + shakeIntensity,
+      y: originalY - shakeIntensity,
+      duration: 40,
+      onComplete: () => {
+        // Second part of shake (in the opposite direction)
+        this.scene.tweens.add({
+          targets: this,
+          x: originalX - shakeIntensity,
+          y: originalY + shakeIntensity,
+          duration: 40,
+          onComplete: () => {
+            // Ensure we return to original position
+            this.x = originalX;
+            this.y = originalY;
+          }
+        });
+      }
+    });
+    
+    // 3. Add dust particles at the base of the building for heavy damage
+    if (amount >= 3 || this.health < this.getMaxHealth() * 0.3) {
+      const particles = this.scene.add.particles(this.x, this.y, 'particle', {
+        x: 0,
+        y: 0,
+        speed: { min: 10, max: 30 },
+        angle: { min: 230, max: 310 }, // Ground level particles
+        scale: { start: 0.4, end: 0 },
+        lifespan: 600,
+        quantity: 5,
+        tint: 0xaaaaaa // Grey dust
+      });
+      
+      // Auto-cleanup
+      this.scene.time.delayedCall(600, () => {
+        particles.destroy();
+      });
+    }
+    
+    // 4. Play a dramatic camera shake for critical damage
+    if (this.health < this.getMaxHealth() * 0.3) {
+      this.scene.cameras.main.shake(150, 0.005);
+    }
   }
   
   addToProductionQueue(unitType: UnitType) {
