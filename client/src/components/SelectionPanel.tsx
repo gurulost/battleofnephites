@@ -65,6 +65,12 @@ export const SelectionPanel = ({ entity, onBuildClick, onTrainClick }: Selection
           <div className="mb-4 text-sm">
             <p>Moves left: {(entity as Unit).movesLeft}</p>
             <p>Actions left: {(entity as Unit).actionsLeft}</p>
+            {/* Show information about whether the unit can act on its first turn */}
+            <p className="mt-1 text-xs text-slate-300">
+              {(entity as Unit).canActOnFirstTurn 
+                ? "Can act on turn created" 
+                : "Cannot act on turn created"}
+            </p>
           </div>
         )}
         

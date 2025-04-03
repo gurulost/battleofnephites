@@ -10,6 +10,7 @@ interface UnitConfig {
   defense: number;
   speed: number;
   state: string;
+  canActOnFirstTurn?: boolean;
 }
 
 export default class Unit extends Phaser.GameObjects.Container {
@@ -41,6 +42,9 @@ export default class Unit extends Phaser.GameObjects.Container {
   private currentPath: {x: number, y: number}[] = [];
   private moveTween?: Phaser.Tweens.Tween;
   
+  // Whether this unit can act on the turn it was created
+  public canActOnFirstTurn: boolean = true;
+  
   constructor(scene: Phaser.Scene, x: number, y: number, type: UnitType, config: UnitConfig) {
     // Calculate the pixel position from grid coordinates
     const { screenX, screenY } = GridUtils.cartesianToIsometric(
@@ -64,6 +68,11 @@ export default class Unit extends Phaser.GameObjects.Container {
     this.defense = config.defense;
     this.speed = config.speed;
     this.state = config.state;
+    
+    // Set whether unit can act on first turn (defaults to true if not specified)
+    if (config.canActOnFirstTurn !== undefined) {
+      this.canActOnFirstTurn = config.canActOnFirstTurn;
+    }
     
     // Store grid position
     this.gridX = x;
@@ -429,6 +438,17 @@ export default class Unit extends Phaser.GameObjects.Container {
     this.actionsLeft = 1;
   }
   
+  /**
+   * Initialize unit actions for the first turn
+   * Can be used to disable actions for newly created units
+   */
+  initializeFirstTurnActions() {
+    if (!this.canActOnFirstTurn) {
+      this.movesLeft = 0;
+      this.actionsLeft = 0;
+    }
+  }
+  
   getStats() {
     return {
       id: this.id,
@@ -438,7 +458,8 @@ export default class Unit extends Phaser.GameObjects.Container {
       defense: this.defense,
       speed: this.speed,
       movesLeft: this.movesLeft,
-      actionsLeft: this.actionsLeft
+      actionsLeft: this.actionsLeft,
+      canActOnFirstTurn: this.canActOnFirstTurn
     };
   }
   

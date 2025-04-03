@@ -51,6 +51,10 @@ export default class MainScene extends Phaser.Scene {
 
   // Graphics
   private movementOverlay: Phaser.GameObjects.Graphics;
+  private buildingPlacementOverlay!: Phaser.GameObjects.Graphics; // Using definite assignment assertion
+  private selectedBuildingPlacementTile!: Phaser.GameObjects.Graphics; // Using definite assignment assertion
+  private buildingPlacementTiles: Array<{tile: Phaser.GameObjects.Image, x: number, y: number}> = [];
+  private selectedBuildingTile: {x: number, y: number} | null = null;
   private selectionIndicator: Phaser.GameObjects.Image;
   private fogOfWar!: FogOfWar; // Using definite assignment assertion
   private soundService: SoundService = SoundService.getInstance();
@@ -61,6 +65,8 @@ export default class MainScene extends Phaser.Scene {
     // Initialize properties to avoid LSP errors
     this.pathFinder = new PathFinder(0, 0); // Will be properly initialized in create()
     this.movementOverlay = undefined as any; // Will be initialized in create()
+    this.buildingPlacementOverlay = undefined as any; // Will be initialized when needed
+    this.selectedBuildingPlacementTile = undefined as any; // Will be initialized when needed
     this.selectionIndicator = undefined as any; // Will be initialized when needed
   }
   
@@ -515,7 +521,7 @@ export default class MainScene extends Phaser.Scene {
     this.updatePathfinderWalkability();
   }
   
-  createUnit(type: UnitType, x: number, y: number, playerId: string, id?: string) {
+  createUnit(type: UnitType, x: number, y: number, playerId: string, id?: string, canActOnFirstTurn: boolean = true) {
     // Create a unique ID if not provided
     const unitId = id || `${type}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
@@ -563,7 +569,8 @@ export default class MainScene extends Phaser.Scene {
         attack,
         defense,
         speed,
-        state: 'idle'
+        state: 'idle',
+        canActOnFirstTurn
       }
     );
     
@@ -952,6 +959,21 @@ export default class MainScene extends Phaser.Scene {
       }
     });
     
+    // Building placement highlight tiles
+    EventBridge.on('ui:showBuildingPlacementTiles', (data: { tiles: Array<{x: number, y: number}>, buildingType: string }) => {
+      this.highlightBuildingPlacementTiles(data.tiles, data.buildingType);
+    });
+    
+    // Clear building placement highlights
+    EventBridge.on('ui:hideBuildingPlacementTiles', () => {
+      this.clearBuildingPlacementHighlights();
+    });
+    
+    // Select a specific tile during building placement
+    EventBridge.on('ui:selectBuildingPlacementTile', (data: { x: number, y: number }) => {
+      this.selectBuildingPlacementTile(data.x, data.y);
+    });
+    
     // End turn action
     EventBridge.on('game:endTurn', () => {
       this.endTurn();
@@ -1058,6 +1080,141 @@ export default class MainScene extends Phaser.Scene {
   clearHighlightedTiles() {
     this.movementOverlay.clear();
     this.highlightedTiles = [];
+  }
+  
+  /**
+   * Highlight tiles for building placement
+   */
+  highlightBuildingPlacementTiles(tiles: Array<{x: number, y: number}>, buildingType: string) {
+    // Clear any existing highlights
+    this.clearHighlightedTiles();
+    this.clearBuildingPlacementHighlights();
+    
+    // Create a graphics object for building placement highlights
+    if (!this.buildingPlacementOverlay) {
+      this.buildingPlacementOverlay = this.add.graphics();
+    } else {
+      this.buildingPlacementOverlay.clear();
+    }
+    
+    // Use a different color for building placement
+    this.buildingPlacementOverlay.fillStyle(0x4a90e2, 0.4); // Blue color for building placement
+    
+    // Highlight each valid tile
+    tiles.forEach(tile => {
+      if (this.isValidBuildingLocation(tile.x, tile.y)) {
+        const { screenX, screenY } = GridUtils.cartesianToIsometric(
+          tile.x, tile.y, this.tileWidth, this.tileHeight
+        );
+        
+        const worldX = this.cameras.main.width / 2 + screenX - (this.mapWidth * this.tileColumnOffset) / 2;
+        const worldY = this.cameras.main.height / 3 + screenY - (this.mapHeight * this.tileRowOffset) / 2;
+        
+        // Create an isometric diamond shape for the highlight
+        const points = [
+          { x: worldX, y: worldY - this.tileHeight / 2 },
+          { x: worldX + this.tileWidth / 2, y: worldY },
+          { x: worldX, y: worldY + this.tileHeight / 2 },
+          { x: worldX - this.tileWidth / 2, y: worldY }
+        ];
+        
+        this.buildingPlacementOverlay.beginPath();
+        this.buildingPlacementOverlay.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          this.buildingPlacementOverlay.lineTo(points[i].x, points[i].y);
+        }
+        this.buildingPlacementOverlay.closePath();
+        this.buildingPlacementOverlay.fillPath();
+        
+        // Store the highlighted tile for later reference
+        this.buildingPlacementTiles.push({
+          tile: this.tiles[tile.y][tile.x],
+          x: tile.x,
+          y: tile.y
+        });
+      } else {
+        console.log(`Tile at ${tile.x}, ${tile.y} is not a valid building location.`);
+      }
+    });
+    
+    // Select the first valid tile by default
+    if (this.buildingPlacementTiles.length > 0) {
+      this.selectBuildingPlacementTile(this.buildingPlacementTiles[0].x, this.buildingPlacementTiles[0].y);
+    }
+  }
+  
+  /**
+   * Clear building placement highlights
+   */
+  clearBuildingPlacementHighlights() {
+    if (this.buildingPlacementOverlay) {
+      this.buildingPlacementOverlay.clear();
+    }
+    
+    if (this.selectedBuildingPlacementTile) {
+      this.selectedBuildingPlacementTile.clear();
+    }
+    
+    this.buildingPlacementTiles = [];
+    this.selectedBuildingTile = null;
+  }
+  
+  /**
+   * Highlight a specific tile as the selected building placement
+   */
+  selectBuildingPlacementTile(x: number, y: number) {
+    // Find if this is a valid placement tile
+    const placementTile = this.buildingPlacementTiles.find((pt: {tile: Phaser.GameObjects.Image, x: number, y: number}) => pt.x === x && pt.y === y);
+    
+    if (!placementTile) {
+      console.log(`Tile at ${x}, ${y} is not a valid building placement tile.`);
+      return;
+    }
+    
+    // Clear the previous selection highlight
+    if (!this.selectedBuildingPlacementTile) {
+      this.selectedBuildingPlacementTile = this.add.graphics();
+    } else {
+      this.selectedBuildingPlacementTile.clear();
+    }
+    
+    // Store the selected tile
+    this.selectedBuildingTile = { x, y };
+    
+    // Convert grid position to screen coordinates
+    const { screenX, screenY } = GridUtils.cartesianToIsometric(
+      x, y, this.tileWidth, this.tileHeight
+    );
+    
+    const worldX = this.cameras.main.width / 2 + screenX - (this.mapWidth * this.tileColumnOffset) / 2;
+    const worldY = this.cameras.main.height / 3 + screenY - (this.mapHeight * this.tileRowOffset) / 2;
+    
+    // Create an isometric diamond outline for the selected tile
+    const points = [
+      { x: worldX, y: worldY - this.tileHeight / 2 },
+      { x: worldX + this.tileWidth / 2, y: worldY },
+      { x: worldX, y: worldY + this.tileHeight / 2 },
+      { x: worldX - this.tileWidth / 2, y: worldY }
+    ];
+    
+    // Draw a thicker, more vibrant outline for the selected tile
+    this.selectedBuildingPlacementTile.lineStyle(3, 0xffd700, 1); // Gold color for selection
+    this.selectedBuildingPlacementTile.beginPath();
+    this.selectedBuildingPlacementTile.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      this.selectedBuildingPlacementTile.lineTo(points[i].x, points[i].y);
+    }
+    this.selectedBuildingPlacementTile.closePath();
+    this.selectedBuildingPlacementTile.strokePath();
+    
+    // Add pulsing effect to the selected tile
+    this.tweens.add({
+      targets: this.selectedBuildingPlacementTile,
+      alpha: 0.5,
+      duration: 500,
+      yoyo: true,
+      repeat: -1
+    });
   }
   
   handleUnitAction(unit: Unit, targetX: number, targetY: number) {
@@ -1687,11 +1844,27 @@ export default class MainScene extends Phaser.Scene {
           );
           
           if (emptyTile) {
-            // Create the new unit
-            this.createUnit(producedUnit, emptyTile.x, emptyTile.y, building.playerId);
+            // Create the new unit with canActOnFirstTurn set to false
+            const newUnit = this.createUnit(producedUnit, emptyTile.x, emptyTile.y, building.playerId, undefined, false);
+            
+            // Initialize the unit's actions for the first turn
+            if (newUnit) {
+              newUnit.initializeFirstTurnActions();
+            }
             
             // Update pathfinder
             this.updatePathfinderWalkability();
+            
+            // Play creation sound effect
+            this.soundService.playSound('unitCreated');
+            
+            // Emit event to notify UI of unit creation
+            EventBridge.emit('phaser:unitCreated', {
+              unitType: producedUnit,
+              x: emptyTile.x,
+              y: emptyTile.y,
+              playerId: building.playerId
+            });
           }
         }
       }
