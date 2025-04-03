@@ -195,13 +195,14 @@ export default class MainScene extends Phaser.Scene {
       this.tileHeight
     );
     
-    // Get the player's units
+    // Get the player's units and buildings
     const humanPlayer = this.players.find(p => p.id === 'player1');
     if (humanPlayer) {
       const playerUnits = this.units.filter(u => u.playerId === humanPlayer.id);
+      const playerBuildings = this.buildings.filter(b => b.playerId === humanPlayer.id);
       
       // Update visibility based on player's units and buildings
-      this.fogOfWar.update(playerUnits, centerX, centerY);
+      this.fogOfWar.update(playerUnits, centerX, centerY, playerBuildings);
     }
   }
   
@@ -1408,11 +1409,12 @@ export default class MainScene extends Phaser.Scene {
         const worldCenterX = this.cameras.main.width / 2;
         const worldCenterY = this.cameras.main.height / 3;
         
-        // Get all player units for visibility calculation
+        // Get all player units and buildings for visibility calculation
         const playerUnits = this.units.filter(u => u.playerId === 'player1');
+        const playerBuildings = this.buildings.filter(b => b.playerId === 'player1');
         
         // Update fog of war
-        this.fogOfWar.update(playerUnits, worldCenterX, worldCenterY);
+        this.fogOfWar.update(playerUnits, worldCenterX, worldCenterY, playerBuildings);
       }
       
       // Call the completion callback if provided

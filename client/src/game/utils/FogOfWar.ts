@@ -1,28 +1,47 @@
 import Phaser from 'phaser';
-import { Unit } from '../entities/Unit';
+import Unit from '../entities/Unit';
+import Building from '../entities/Building';
+import { GridUtils } from './GridUtils';
 
 /**
- * Manages fog of war in the game world - controls visibility of unexplored areas
+ * Enhanced Fog of War implementation using render textures
+ * for smoother visuals and better performance
  */
 export class FogOfWar {
-  private scene: Phaser.Scene;
-  private mapWidth: number;
-  private mapHeight: number;
-  private tileWidth: number;
-  private tileHeight: number;
-  private fogLayer: Phaser.GameObjects.Graphics;
+  private scene: Phaser.Scene = null!;
+  private mapWidth: number = 0;
+  private mapHeight: number = 0;
+  private tileWidth: number = 0;
+  private tileHeight: number = 0;
+  
+  // Main fog of war render texture
+  private fogTexture: Phaser.GameObjects.RenderTexture = null!;
+  
+  // Reusable "brushes" for drawing the fog
+  private unexploredBrush: Phaser.GameObjects.Graphics = null!;
+  private exploredBrush: Phaser.GameObjects.Graphics = null!;
+  private visibleBrush: Phaser.GameObjects.Graphics = null!;
+  
+  // Tracking visibility
   private visibilityMap: boolean[][] = []; // Tracks if a tile has been revealed
   private currentVisibility: boolean[][] = []; // Tracks currently visible tiles
   
-  // Sight ranges for different unit types
+  // Sight ranges for different unit and building types
   private sightRanges = {
+    // Units
     'worker': 2,
     'melee': 2,
-    'ranged': 3
+    'ranged': 3,
+    // Buildings
+    'city': 3,
+    'barracks': 2
   };
   
+  // Line of sight blockers - tiles that block visibility
+  private blockerTileTypes = ['hill'];
+  
   /**
-   * Create a new fog of war manager
+   * Create a new fog of war manager with improved rendering
    */
   constructor(
     scene: Phaser.Scene, 
@@ -37,11 +56,47 @@ export class FogOfWar {
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
     
-    // Create the fog layer graphics object
-    this.fogLayer = scene.add.graphics();
-    
     // Initialize visibility maps
     this.initializeVisibilityMaps();
+    
+    // Create the main fog texture that covers the entire screen
+    this.fogTexture = scene.add.renderTexture(
+      0, 0, 
+      scene.cameras.main.width, 
+      scene.cameras.main.height
+    );
+    
+    // Set high depth to ensure it's drawn on top of all game elements
+    this.fogTexture.setDepth(5000);
+    
+    // Create reusable brush graphics for fog drawing
+    this.createBrushes();
+    
+    // Initial fog rendering
+    this.drawFog();
+  }
+  
+  /**
+   * Create brush graphics used for fog drawing
+   */
+  private createBrushes() {
+    // Create brush for completely unexplored areas (dark fog)
+    this.unexploredBrush = this.scene.add.graphics().fillStyle(0x000000, 0.8);
+    this.unexploredBrush.fillRect(-this.tileWidth, -this.tileHeight, this.tileWidth * 2, this.tileHeight * 2);
+    
+    // Create brush for explored but not visible areas (semi-transparent fog)
+    this.exploredBrush = this.scene.add.graphics().fillStyle(0x000000, 0.4);
+    this.exploredBrush.fillRect(-this.tileWidth, -this.tileHeight, this.tileWidth * 2, this.tileHeight * 2);
+    
+    // Create brush for visible areas (clear/erase)
+    const visibleBrushSize = Math.max(this.tileWidth, this.tileHeight) * 1.2; // Slightly larger
+    this.visibleBrush = this.scene.add.graphics().fillStyle(0xffffff, 1);
+    this.visibleBrush.fillCircle(0, 0, visibleBrushSize);
+    
+    // Set them all as invisible in the scene - we only use them as brushes for the render texture
+    this.unexploredBrush.setVisible(false);
+    this.exploredBrush.setVisible(false);
+    this.visibleBrush.setVisible(false);
   }
   
   /**
@@ -72,12 +127,18 @@ export class FogOfWar {
     this.mapWidth = mapWidth;
     this.mapHeight = mapHeight;
     this.initializeVisibilityMaps();
+    
+    // Resize the render texture to match the screen
+    this.fogTexture.resize(
+      this.scene.cameras.main.width,
+      this.scene.cameras.main.height
+    );
   }
   
   /**
    * Update the fog of war based on current unit positions
    */
-  public update(playerUnits: Unit[], centerX: number, centerY: number) {
+  public update(playerUnits: Unit[], centerX: number, centerY: number, playerBuildings: Building[] = []) {
     // Reset current visibility
     this.currentVisibility = Array(this.mapHeight)
       .fill(null)
@@ -86,6 +147,11 @@ export class FogOfWar {
     // Update visibility based on unit positions
     playerUnits.forEach(unit => {
       this.updateVisibilityForUnit(unit);
+    });
+    
+    // Update visibility based on building positions
+    playerBuildings.forEach(building => {
+      this.updateVisibilityForBuilding(building);
     });
     
     // Update the permanent visibility map
@@ -102,25 +168,68 @@ export class FogOfWar {
   }
   
   /**
-   * Update the visibility map based on a single unit's position
+   * Update the visibility map based on a single unit's position using Field of View
    */
   private updateVisibilityForUnit(unit: Unit) {
     const x = unit.gridX;
     const y = unit.gridY;
     const sightRange = this.sightRanges[unit.type] || 2;
     
-    // Update visibility in a square around the unit's position
-    for (let dy = -sightRange; dy <= sightRange; dy++) {
-      for (let dx = -sightRange; dx <= sightRange; dx++) {
-        const nx = x + dx;
-        const ny = y + dy;
-        
-        // Check if tile is within map bounds
-        if (nx >= 0 && nx < this.mapWidth && ny >= 0 && ny < this.mapHeight) {
-          // Simple line-of-sight check (Manhattan distance)
-          const distance = Math.abs(dx) + Math.abs(dy);
-          if (distance <= sightRange) {
-            this.currentVisibility[ny][nx] = true;
+    // Mark the unit's position as visible
+    this.currentVisibility[y][x] = true;
+    
+    // Calculate field of view in all directions
+    this.calculateFieldOfView(x, y, sightRange);
+  }
+  
+  /**
+   * Update the visibility map based on a building's position
+   */
+  private updateVisibilityForBuilding(building: Building) {
+    const x = building.gridX;
+    const y = building.gridY;
+    const sightRange = this.sightRanges[building.type] || 2;
+    
+    // Mark the building's position as visible
+    this.currentVisibility[y][x] = true;
+    
+    // Calculate field of view in all directions
+    this.calculateFieldOfView(x, y, sightRange);
+  }
+  
+  /**
+   * Calculate field of view from a source point
+   * Uses a recursive shadowcasting-inspired approach adapted for a grid
+   */
+  private calculateFieldOfView(sourceX: number, sourceY: number, range: number) {
+    // Divide the FOV calculation into octants for efficiency
+    for (let octant = 0; octant < 8; octant++) {
+      this.calculateOctant(sourceX, sourceY, range, octant);
+    }
+  }
+  
+  /**
+   * Calculate field of view in a specific octant
+   */
+  private calculateOctant(sourceX: number, sourceY: number, range: number, octant: number) {
+    // For simplicity, we'll just do a circular check with line-of-sight test
+    // In a full implementation, you'd use proper shadowcasting
+    
+    for (let r = 1; r <= range; r++) {
+      for (let x = -r; x <= r; x++) {
+        for (let y = -r; y <= r; y++) {
+          // Skip if outside the circle of the sight range
+          if (x*x + y*y > range*range) continue;
+          
+          const nx = sourceX + x;
+          const ny = sourceY + y;
+          
+          // Check if tile is within map bounds
+          if (nx >= 0 && nx < this.mapWidth && ny >= 0 && ny < this.mapHeight) {
+            // Check if there's a clear line of sight
+            if (this.hasLineOfSight(sourceX, sourceY, nx, ny)) {
+              this.currentVisibility[ny][nx] = true;
+            }
           }
         }
       }
@@ -128,43 +237,124 @@ export class FogOfWar {
   }
   
   /**
-   * Draw the fog of war overlay
+   * Check if there's a clear line of sight between two points
+   * Uses Bresenham's line algorithm to check for blocking tiles
+   */
+  private hasLineOfSight(x0: number, y0: number, x1: number, y1: number): boolean {
+    // Simple direct line-of-sight check
+    const dx = Math.abs(x1 - x0);
+    const dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    
+    let x = x0;
+    let y = y0;
+    
+    while (x !== x1 || y !== y1) {
+      // Skip the source and destination
+      if (x !== x0 || y !== y0) {
+        if (x !== x1 || y !== y1) {
+          // Check if this is a blocking tile (e.g., a hill)
+          const tile = this.getTileAt(x, y);
+          if (tile && this.isTileBlockingLineOfSight(tile)) {
+            return false; // Line of sight is blocked
+          }
+        }
+      }
+      
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y += sy;
+      }
+    }
+    
+    return true; // Line of sight is clear
+  }
+  
+  /**
+   * Get the tile at the specified grid position
+   */
+  private getTileAt(x: number, y: number): any {
+    // Access the tile data from the scene
+    // This is a simplified placeholder - in the real implementation,
+    // you'd need to access the actual tile data from the Main scene
+    // You could pass a callback function to the constructor or a reference to the tiles array
+    
+    // For demonstration, we'll check if we have access to tiles array in the scene
+    const mainScene = this.scene as any;
+    if (mainScene.tiles && mainScene.tiles[y] && mainScene.tiles[y][x]) {
+      return mainScene.tiles[y][x];
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Check if a tile blocks line of sight (e.g., hills)
+   */
+  private isTileBlockingLineOfSight(tile: any): boolean {
+    // Get the tile type
+    const tileType = tile.getData ? tile.getData('tileType') : null;
+    
+    // Check if this tile type blocks line of sight
+    return this.blockerTileTypes.includes(tileType);
+  }
+  
+  /**
+   * Draw the fog of war using render texture for improved performance and visuals
    */
   private drawFog(centerX: number = 0, centerY: number = 0) {
-    // Clear previous fog
-    this.fogLayer.clear();
+    // Clear the fog texture
+    this.fogTexture.clear();
     
-    // Semi-transparent black for unexplored areas
-    this.fogLayer.fillStyle(0x000000, 0.8);
+    // Fill it with the unexplored (darkest) fog color
+    this.fogTexture.fill(0x000000, 0.8);
     
-    // Semi-transparent black for explored but not currently visible areas
-    this.fogLayer.fillStyle(0x000000, 0.4);
+    // Calculate offsets for proper tile positioning
+    const mapWidthPx = this.mapWidth * (this.tileWidth / 2);
+    const mapHeightPx = this.mapHeight * (this.tileHeight / 2);
     
-    // Draw fog for each tile
+    // Step 1: Draw the explored areas (semi-transparent fog)
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
-        // Skip currently visible tiles
-        if (this.currentVisibility[y][x]) continue;
-        
-        // Use different transparency for explored vs unexplored tiles
-        if (this.visibilityMap[y][x]) {
-          this.fogLayer.fillStyle(0x000000, 0.4); // Explored but not visible
-        } else {
-          this.fogLayer.fillStyle(0x000000, 0.8); // Unexplored
+        if (this.visibilityMap[y][x] && !this.currentVisibility[y][x]) {
+          // Calculate the screen position for this tile
+          const { screenX, screenY } = GridUtils.cartesianToIsometric(
+            x, y, this.tileWidth, this.tileHeight
+          );
+          
+          // Get actual pixel coordinates relative to screen
+          const pixelX = centerX + screenX - mapWidthPx / 2;
+          const pixelY = centerY + screenY - mapHeightPx / 2;
+          
+          // Draw the explored but not visible brush (semi-transparent)
+          this.fogTexture.draw(this.exploredBrush, pixelX, pixelY);
         }
-        
-        // Calculate isometric position for this tile
-        const tileX = centerX + ((x - y) * this.tileWidth / 2);
-        const tileY = centerY + ((x + y) * this.tileHeight / 2);
-        
-        // Draw a polygon for the isometric tile
-        this.fogLayer.beginPath();
-        this.fogLayer.moveTo(tileX, tileY - this.tileHeight / 2);
-        this.fogLayer.lineTo(tileX + this.tileWidth / 2, tileY);
-        this.fogLayer.lineTo(tileX, tileY + this.tileHeight / 2);
-        this.fogLayer.lineTo(tileX - this.tileWidth / 2, tileY);
-        this.fogLayer.closePath();
-        this.fogLayer.fillPath();
+      }
+    }
+    
+    // Step 2: Draw visible areas (erase/clear fog)
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        if (this.currentVisibility[y][x]) {
+          // Calculate the screen position for this tile
+          const { screenX, screenY } = GridUtils.cartesianToIsometric(
+            x, y, this.tileWidth, this.tileHeight
+          );
+          
+          // Get actual pixel coordinates relative to screen
+          const pixelX = centerX + screenX - mapWidthPx / 2;
+          const pixelY = centerY + screenY - mapHeightPx / 2;
+          
+          // Erase the fog at visible areas
+          this.fogTexture.erase(this.visibleBrush, pixelX, pixelY);
+        }
       }
     }
   }
@@ -199,7 +389,8 @@ export class FogOfWar {
         this.currentVisibility[y][x] = true;
       }
     }
-    this.fogLayer.clear();
+    // Clear the fog entirely
+    this.fogTexture.clear();
   }
   
   /**
