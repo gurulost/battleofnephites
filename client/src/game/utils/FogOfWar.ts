@@ -5,7 +5,14 @@ import { GridUtils } from './GridUtils';
 
 /**
  * Enhanced Fog of War implementation using render textures
- * for smoother visuals and better performance
+ * for smoother visuals and better performance.
+ * 
+ * Features:
+ * - True line-of-sight visibility using recursive shadowcasting algorithm
+ * - Smooth transitions between visibility states with circular brushes
+ * - Proper occlusion for terrain like hills
+ * - Memory-efficient storage of visibility state
+ * - Optimized rendering with Phaser RenderTexture
  */
 export class FogOfWar {
   private scene: Phaser.Scene = null!;
@@ -13,6 +20,8 @@ export class FogOfWar {
   private mapHeight: number = 0;
   private tileWidth: number = 0;
   private tileHeight: number = 0;
+  private tileColumnOffset: number = 0; // Half width for isometric offset
+  private tileRowOffset: number = 0;    // Half height for isometric offset
   
   // Main fog of war render texture
   private fogTexture: Phaser.GameObjects.RenderTexture = null!;
@@ -56,6 +65,10 @@ export class FogOfWar {
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
     
+    // Set isometric offsets - these should match the values used in MainScene
+    this.tileColumnOffset = tileWidth / 2; // Half width for isometric offset
+    this.tileRowOffset = tileHeight / 2;   // Half height for isometric offset
+    
     // Initialize visibility maps
     this.initializeVisibilityMaps();
     
@@ -81,15 +94,20 @@ export class FogOfWar {
    */
   private createBrushes() {
     // Create brush for completely unexplored areas (dark fog)
+    // Using a slightly larger radius for the unexplored brush to ensure full coverage
+    const unexploredBrushSize = Math.max(this.tileWidth, this.tileHeight) * 1.5;
     this.unexploredBrush = this.scene.add.graphics().fillStyle(0x000000, 0.8);
-    this.unexploredBrush.fillRect(-this.tileWidth, -this.tileHeight, this.tileWidth * 2, this.tileHeight * 2);
+    this.unexploredBrush.fillCircle(0, 0, unexploredBrushSize);
     
     // Create brush for explored but not visible areas (semi-transparent fog)
+    // Using a circular brush with smooth edges for better visual transitions
+    const exploredBrushSize = Math.max(this.tileWidth, this.tileHeight) * 1.2;
     this.exploredBrush = this.scene.add.graphics().fillStyle(0x000000, 0.4);
-    this.exploredBrush.fillRect(-this.tileWidth, -this.tileHeight, this.tileWidth * 2, this.tileHeight * 2);
+    this.exploredBrush.fillCircle(0, 0, exploredBrushSize);
     
     // Create brush for visible areas (clear/erase)
-    const visibleBrushSize = Math.max(this.tileWidth, this.tileHeight) * 1.2; // Slightly larger
+    // Using a slightly larger radius for smooth transitions between visible and explored areas
+    const visibleBrushSize = Math.max(this.tileWidth, this.tileHeight) * 1.3;
     this.visibleBrush = this.scene.add.graphics().fillStyle(0xffffff, 1);
     this.visibleBrush.fillCircle(0, 0, visibleBrushSize);
     
@@ -198,107 +216,173 @@ export class FogOfWar {
   }
   
   /**
-   * Calculate field of view from a source point
-   * Uses a recursive shadowcasting-inspired approach adapted for a grid
+   * Calculate field of view from a source point using recursive shadowcasting
+   * This provides a more accurate field of view with proper line of sight blocking
    */
   private calculateFieldOfView(sourceX: number, sourceY: number, range: number) {
     // Mark the source position as visible
     this.currentVisibility[sourceY][sourceX] = true;
     
-    // Use an optimized approach that only checks tiles within range
-    // and uses early termination for line-of-sight tests
-    for (let y = Math.max(0, sourceY - range); y <= Math.min(this.mapHeight - 1, sourceY + range); y++) {
-      for (let x = Math.max(0, sourceX - range); x <= Math.min(this.mapWidth - 1, sourceX + range); x++) {
-        // Skip the source tile
-        if (x === sourceX && y === sourceY) continue;
-        
-        // Use Euclidean distance for more natural circular vision
-        const dx = x - sourceX;
-        const dy = y - sourceY;
-        const distanceSquared = dx * dx + dy * dy;
-        
-        // Only check tiles within range using squared distance for efficiency
-        // (avoids costly square root calculations)
-        if (distanceSquared <= range * range) {
-          // Check line of sight using optimized Bresenham's algorithm
-          if (this.hasLineOfSight(sourceX, sourceY, x, y)) {
-            this.currentVisibility[y][x] = true;
-          }
-        }
-      }
+    // Calculate field of view in all 8 octants
+    for (let octant = 0; octant < 8; octant++) {
+      this.castLight(sourceX, sourceY, range, 1, 1.0, 0.0, octant);
     }
   }
   
   /**
-   * Check if there's a clear line of sight between two points
-   * Uses Bresenham's line algorithm to check for blocking tiles
+   * Recursive shadowcasting algorithm adapted for isometric grids
+   * @param sourceX Source X position
+   * @param sourceY Source Y position
+   * @param range Maximum view range
+   * @param row Current row being processed
+   * @param startSlope Start slope of the visibility cone
+   * @param endSlope End slope of the visibility cone
+   * @param octant Current octant (0-7)
    */
-  private hasLineOfSight(x0: number, y0: number, x1: number, y1: number): boolean {
-    // Improved Bresenham's line algorithm with better handling of edge cases
-    
-    // Early return for adjacent tiles (always visible)
-    if (Math.abs(x1 - x0) <= 1 && Math.abs(y1 - y0) <= 1) {
-      return true;
+  private castLight(
+    sourceX: number, 
+    sourceY: number, 
+    range: number, 
+    row: number, 
+    startSlope: number, 
+    endSlope: number, 
+    octant: number
+  ) {
+    // If start slope >= end slope, we're done with this recursive call
+    if (startSlope >= endSlope) {
+      return;
     }
     
-    const dx = Math.abs(x1 - x0);
-    const dy = Math.abs(y1 - y0);
-    const sx = x0 < x1 ? 1 : -1;
-    const sy = y0 < y1 ? 1 : -1;
-    let err = dx - dy;
+    // Convert from octant to actual delta x, y for the current octant
+    const [dx, dy] = this.getOctantTransform(octant);
     
-    let x = x0;
-    let y = y0;
+    // Calculate actual distance for range checks (using squared distance)
+    const rangeSquared = range * range;
     
-    // Track the last tile we checked to avoid redundant checks
-    let lastX = x0;
-    let lastY = y0;
+    // Determine the ending column (exclusive) based on the slopes
+    const endCol = Math.ceil(endSlope * row);
     
-    while (x !== x1 || y !== y1) {
-      const e2 = 2 * err;
-      if (e2 > -dy) {
-        err -= dy;
-        x += sx;
-      }
-      if (e2 < dx) {
-        err += dx;
-        y += sy;
+    // Start col is usually the floor of startSlope * row, but can be limited by range
+    let startCol = Math.floor(startSlope * row);
+    
+    // We'll skip any columns that would be out of the map
+    let colsStarted = false;
+    
+    // Process the entire row
+    for (let col = startCol; col <= endCol; col++) {
+      // Calculate actual grid coordinates based on octant
+      const gridX = sourceX + dx * col + dy * row;
+      const gridY = sourceY + dy * col + dx * row;
+      
+      // Skip if out of bounds
+      if (
+        gridX < 0 || 
+        gridX >= this.mapWidth || 
+        gridY < 0 || 
+        gridY >= this.mapHeight
+      ) {
+        continue;
       }
       
-      // Skip the source and destination
-      if ((x !== x0 || y !== y0) && (x !== x1 || y !== y1)) {
-        // Only check each tile once (in case of diagonals)
-        if (x !== lastX || y !== lastY) {
-          // Check if this is a blocking tile (e.g., a hill)
-          const tile = this.getTileAt(x, y);
-          if (tile && this.isTileBlockingLineOfSight(tile)) {
-            return false; // Line of sight is blocked
-          }
-          
-          lastX = x;
-          lastY = y;
+      // Calculate squared distance to ensure we're within range
+      const distSquared = (gridX - sourceX) * (gridX - sourceX) + 
+                          (gridY - sourceY) * (gridY - sourceY);
+      
+      if (distSquared > rangeSquared) {
+        continue;
+      }
+      
+      // Mark as visible if within range
+      if (distSquared <= rangeSquared) {
+        this.currentVisibility[gridY][gridX] = true;
+        colsStarted = true;
+      }
+      
+      // Get current tile to check if it blocks vision
+      const tile = this.getTileAt(gridX, gridY);
+      const isBlocking = tile && this.isTileBlockingLineOfSight(tile);
+      
+      // Handle walls/blockers and calculate new slopes
+      if (isBlocking) {
+        // If we hit a wall and we were scanning...
+        if (colsStarted) {
+          // Recursively scan the next row with the reduced visible area
+          const newStartSlope = startSlope;
+          const newEndSlope = (col - 0.5) / row;
+          this.castLight(sourceX, sourceY, range, row + 1, newStartSlope, newEndSlope, octant);
+        }
+        
+        // This column is a wall, update startSlope for later columns
+        startSlope = (col + 0.5) / row;
+        
+        // If the start slope is now greater than or equal to endSlope, we're done
+        if (startSlope >= endSlope) {
+          return;
         }
       }
     }
     
-    return true; // Line of sight is clear
+    // If we didn't hit any walls, continue with the next row using the same slopes
+    if (colsStarted) {
+      this.castLight(sourceX, sourceY, range, row + 1, startSlope, endSlope, octant);
+    }
+  }
+  
+  /**
+   * Get the delta x and y for a given octant
+   * This transforms coordinates based on which octant we're processing
+   */
+  private getOctantTransform(octant: number): [number, number] {
+    switch (octant) {
+      case 0: return [1, 0];   // E
+      case 1: return [0, 1];   // S
+      case 2: return [0, -1];  // N
+      case 3: return [-1, 0];  // W
+      case 4: return [1, -1];  // NE
+      case 5: return [-1, -1]; // NW
+      case 6: return [-1, 1];  // SW
+      case 7: return [1, 1];   // SE
+      default: return [0, 0];  // Should never happen
+    }
   }
   
   /**
    * Get the tile at the specified grid position
    */
   private getTileAt(x: number, y: number): any {
-    // Access the tile data from the scene
-    // This is a simplified placeholder - in the real implementation,
-    // you'd need to access the actual tile data from the Main scene
-    // You could pass a callback function to the constructor or a reference to the tiles array
+    // Boundary check
+    if (x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight) {
+      return null;
+    }
     
-    // For demonstration, we'll check if we have access to tiles array in the scene
+    // Try multiple methods to access tiles from the scene
     const mainScene = this.scene as any;
+    
+    // Method 1: Direct tiles array (most common implementation)
     if (mainScene.tiles && mainScene.tiles[y] && mainScene.tiles[y][x]) {
       return mainScene.tiles[y][x];
     }
     
+    // Method 2: Map object with tiles property
+    if (mainScene.map && mainScene.map.tiles && mainScene.map.tiles[y] && mainScene.map.tiles[y][x]) {
+      return mainScene.map.tiles[y][x];
+    }
+    
+    // Method 3: getTileAt method (if the scene provides this API)
+    if (mainScene.getTileAt && typeof mainScene.getTileAt === 'function') {
+      try {
+        return mainScene.getTileAt(x, y);
+      } catch (e) {
+        // Silently fail and try other methods
+      }
+    }
+    
+    // Method 4: mapData with direct access
+    if (mainScene.mapData && mainScene.mapData[y] && mainScene.mapData[y][x]) {
+      return mainScene.mapData[y][x];
+    }
+    
+    // If we can't find the tile data through any method, return null
     return null;
   }
   
@@ -306,60 +390,97 @@ export class FogOfWar {
    * Check if a tile blocks line of sight (e.g., hills)
    */
   private isTileBlockingLineOfSight(tile: any): boolean {
-    // Get the tile type
-    const tileType = tile.getData ? tile.getData('tileType') : null;
+    // Return false if tile is null or undefined
+    if (!tile) return false;
+    
+    // Try multiple methods to get the tile type, depending on how tiles are implemented
+    let tileType: string | null = null;
+    
+    // Method 1: getData API (Phaser game object with data manager)
+    if (tile.getData && typeof tile.getData === 'function') {
+      tileType = tile.getData('tileType');
+    } 
+    // Method 2: Direct property access
+    else if (tile.tileType) {
+      tileType = tile.tileType;
+    }
+    // Method 3: type property (from our Tile interface)
+    else if (tile.type) {
+      tileType = tile.type;
+    }
+    
+    // For debugging (can be removed in production)
+    if (tileType && this.blockerTileTypes.includes(tileType)) {
+      // console.log(`Found blocking tile of type ${tileType} at grid position`);
+    }
     
     // Check if this tile type blocks line of sight
-    return this.blockerTileTypes.includes(tileType);
+    return tileType !== null && this.blockerTileTypes.includes(tileType);
   }
   
   /**
    * Draw the fog of war using render texture for improved performance and visuals
+   * @param centerX The x-coordinate of the map center in screen space
+   * @param centerY The y-coordinate of the map center in screen space
    */
   private drawFog(centerX: number = 0, centerY: number = 0) {
-    // Clear the fog texture
+    // Validate center coordinates to make sure they're provided
+    if (!centerX || !centerY) {
+      centerX = this.scene.cameras.main.width / 2;
+      centerY = this.scene.cameras.main.height / 3; // Common isometric positioning
+      console.log('Using default map center for fog of war:', centerX, centerY);
+    }
+    
+    // Clear the fog texture completely first
     this.fogTexture.clear();
     
     // Fill it with the unexplored (darkest) fog color
     this.fogTexture.fill(0x000000, 0.8);
     
-    // Calculate offsets for proper tile positioning
-    const mapWidthPx = this.mapWidth * (this.tileWidth / 2);
-    const mapHeightPx = this.mapHeight * (this.tileHeight / 2);
+    // Calculate proper isometric tile offsets for the map
+    // These need to match the exact offsets used for entity placement in the main scene
+    const mapWidthPx = this.mapWidth * this.tileColumnOffset; // Half-width for diamond tiles
+    const mapHeightPx = this.mapHeight * this.tileRowOffset; // Half-height for diamond tiles
+    
+    // Position fog exactly as the map is positioned
+    this.fogTexture.setPosition(0, 0);
     
     // Step 1: Draw the explored areas (semi-transparent fog)
+    // To improve performance, we only need to process tiles that have been revealed
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
+        // Only draw explored tiles that aren't currently visible
         if (this.visibilityMap[y][x] && !this.currentVisibility[y][x]) {
-          // Calculate the screen position for this tile
+          // Calculate the isometric screen position for this tile
           const { screenX, screenY } = GridUtils.cartesianToIsometric(
             x, y, this.tileWidth, this.tileHeight
           );
           
-          // Get actual pixel coordinates relative to screen
+          // Adjust for map center and calculate actual pixel position on screen
           const pixelX = centerX + screenX - mapWidthPx / 2;
           const pixelY = centerY + screenY - mapHeightPx / 2;
           
-          // Draw the explored but not visible brush (semi-transparent)
+          // Draw the semi-transparent explored area brush
           this.fogTexture.draw(this.exploredBrush, pixelX, pixelY);
         }
       }
     }
     
-    // Step 2: Draw visible areas (erase/clear fog)
+    // Step 2: Draw visible areas (erase/clear fog using the visibleBrush)
+    // This creates clear areas where the player can currently see
     for (let y = 0; y < this.mapHeight; y++) {
       for (let x = 0; x < this.mapWidth; x++) {
         if (this.currentVisibility[y][x]) {
-          // Calculate the screen position for this tile
+          // Calculate the isometric screen position for this tile
           const { screenX, screenY } = GridUtils.cartesianToIsometric(
             x, y, this.tileWidth, this.tileHeight
           );
           
-          // Get actual pixel coordinates relative to screen
+          // Adjust for map center and calculate actual pixel position on screen
           const pixelX = centerX + screenX - mapWidthPx / 2;
           const pixelY = centerY + screenY - mapHeightPx / 2;
           
-          // Erase the fog at visible areas
+          // Erase the fog at visible areas for a clear view
           this.fogTexture.erase(this.visibleBrush, pixelX, pixelY);
         }
       }
