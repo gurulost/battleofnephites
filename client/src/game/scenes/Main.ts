@@ -95,19 +95,19 @@ export default class MainScene extends Phaser.Scene {
     
     // Nephite unit spritesheets
     this.load.atlas(
-      'nephite-worker-atlas',
+      'nephites-worker-atlas',
       'assets/images/units/spritesheets/nephite-worker.png',
       'assets/images/units/spritesheets/nephite-worker.json'
     );
     
     this.load.atlas(
-      'nephite-melee-atlas',
+      'nephites-melee-atlas',
       'assets/images/units/spritesheets/nephite-melee.png',
       'assets/images/units/spritesheets/nephite-melee.json'
     );
     
     this.load.atlas(
-      'nephite-ranged-atlas',
+      'nephites-ranged-atlas',
       'assets/images/units/spritesheets/nephite-ranged.png',
       'assets/images/units/spritesheets/nephite-ranged.json'
     );
@@ -276,6 +276,7 @@ export default class MainScene extends Phaser.Scene {
       }
     };
     
+    console.log('Setting up animations for nephites faction units');
     // Create animations for each unit type for the Nephites faction
     createAnimsForUnit('nephites', 'worker');
     createAnimsForUnit('nephites', 'melee');
