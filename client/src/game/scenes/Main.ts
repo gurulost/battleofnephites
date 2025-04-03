@@ -9,6 +9,25 @@ import { TileType, UnitType, BuildingType } from '../../types/game';
 import { SoundService } from '../../lib/services/SoundService';
 
 export default class MainScene extends Phaser.Scene {
+  /**
+   * Returns a formatted display name for a faction
+   */
+  getFactionDisplayName(faction: string): string {
+    switch (faction) {
+      case 'nephites':
+        return 'Nephites';
+      case 'lamanites':
+        return 'Lamanites';
+      case 'mulekites':
+        return 'Mulekites';
+      case 'anti-nephi-lehies':
+        return 'Anti-Nephi-Lehies';
+      case 'jaredites':
+        return 'Jaredites';
+      default:
+        return 'Unknown Faction';
+    }
+  }
   // Map properties
   private mapWidth: number = 15;
   private mapHeight: number = 15;
@@ -805,46 +824,117 @@ export default class MainScene extends Phaser.Scene {
     EventBridge.on('ui:setupGame', (data: any) => {
       console.log('Custom game setup received:', data);
       
-      // Handle custom game setup - recreate the map with the new settings
-      if (data.map) {
-        // Reset game state
-        this.resetGameState();
+      // Reset the current game state
+      this.resetGameState();
+      
+      // Prioritize data passed through the event if it's complete
+      if (data && data.players && data.players.length > 0) {
+        console.log('Using data passed through event');
         
-        // Set map dimensions
-        this.mapWidth = data.map.width;
-        this.mapHeight = data.map.height;
+        // Set map dimensions from event data
+        if (data.map && data.map.width && data.map.height) {
+          this.mapWidth = data.map.width || 15;
+          this.mapHeight = data.map.height || 15;
+        }
         
-        // Initialize players with custom data
+        // Initialize players with event data
         this.initializePlayers(data.players);
+      } 
+      // Fallback to window.gameSetupState
+      else {
+        // Check the global game setup state
+        const gameSetupState = (window as any).gameSetupState;
         
-        // Recreate the map
-        const worldCenterX = this.cameras.main.width / 2;
-        const worldCenterY = this.cameras.main.height / 3;
-        
-        // Use the map data from the generator if available
-        if (data.map.data && Array.isArray(data.map.data)) {
-          this.createMapFromData(data.map.data, worldCenterX, worldCenterY);
+        if (gameSetupState && gameSetupState.selectedFaction) {
+          console.log('Using global game setup state:', gameSetupState);
+          
+          // Set map size based on number of opponents
+          const opponentCount = gameSetupState.opponents || 1;
+          if (opponentCount >= 1 && opponentCount <= 5) {
+            // Scale map size with opponent count
+            const baseSize = 15;
+            const sizeIncrement = 5;
+            this.mapWidth = baseSize + (opponentCount - 1) * sizeIncrement;
+            this.mapHeight = baseSize + (opponentCount - 1) * sizeIncrement;
+          } else {
+            this.mapWidth = 15;
+            this.mapHeight = 15;
+          }
+          
+          // Create player data based on setup
+          const players = [];
+          
+          // Available factions for AI opponents
+          const availableFactions = ['nephites', 'lamanites', 'mulekites', 'anti-nephi-lehies', 'jaredites'];
+          
+          // Filter out player's faction from available AI factions
+          const aiFactions = availableFactions.filter(faction => faction !== gameSetupState.selectedFaction);
+          
+          // Create human player data
+          players.push({
+            id: 'player1',
+            name: this.getFactionDisplayName(gameSetupState.selectedFaction),
+            faction: gameSetupState.selectedFaction,
+            resources: { food: 10, production: 10 },
+            units: [],
+            buildings: [],
+            startingCityId: 'city1'
+          });
+          
+          // Add AI opponents based on setup
+          for (let i = 0; i < opponentCount; i++) {
+            const aiFaction = aiFactions[i % aiFactions.length];
+            
+            players.push({
+              id: `player${i + 2}`,
+              name: this.getFactionDisplayName(aiFaction) + ` ${i + 1}`,
+              faction: aiFaction,
+              resources: { food: 10, production: 10 },
+              units: [],
+              buildings: [],
+              startingCityId: `city${i + 2}`
+            });
+          }
+          
+          // Initialize players with generated data
+          this.initializePlayers(players);
         } else {
-          this.createMap(worldCenterX, worldCenterY);
+          // No valid setup data, use defaults
+          console.log('No valid setup data, using defaults');
+          this.mapWidth = 15;
+          this.mapHeight = 15;
+          this.initializePlayers();
         }
-        
-        // Place initial entities based on player count and starting positions
-        if (data.map.startingPositions) {
-          this.placeInitialEntitiesFromData(data.map.startingPositions);
-        } else {
-          this.placeInitialEntities();
-        }
-        
-        // Initialize fog of war
-        this.initializeFogOfWar(worldCenterX, worldCenterY);
-        
-        // Reset pathfinder with new map size
-        this.pathFinder = new PathFinder(this.mapWidth, this.mapHeight);
-        this.updatePathfinderWalkability();
-        
-        // Update UI
-        this.updateUI();
       }
+      
+      // Recreate the map
+      const worldCenterX = this.cameras.main.width / 2;
+      const worldCenterY = this.cameras.main.height / 3;
+      
+      // Use map data from the event if available
+      if (data && data.map && data.map.data && Array.isArray(data.map.data)) {
+        this.createMapFromData(data.map.data, worldCenterX, worldCenterY);
+      } else {
+        // Otherwise create a random map
+        this.createMap(worldCenterX, worldCenterY);
+      }
+      
+      // Place initial entities based on starting positions or default positions
+      if (data && data.map && data.map.startingPositions) {
+        this.placeInitialEntitiesFromData(data.map.startingPositions);
+      } else {
+        this.placeInitialEntities();
+      }
+      
+      // Initialize fog of war
+      this.initializeFogOfWar(worldCenterX, worldCenterY);
+      
+      // Reset pathfinder with new map size
+      this.pathFinder = new PathFinder(this.mapWidth, this.mapHeight);
+      this.updatePathfinderWalkability();
+      
+      // Update UI
+      this.updateUI();
     });
     
     // Train unit action

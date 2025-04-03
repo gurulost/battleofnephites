@@ -69,106 +69,21 @@ export const useGameState = create<GameState>()(
     },
     
     moveUnit: (unit, x, y) => {
-      set(state => {
-        // Find the player who owns this unit
-        const playerIndex = state.players.findIndex(p => p.id === unit.playerId);
-        if (playerIndex === -1) return state;
-        
-        // Find the unit in the player's units
-        const unitIndex = state.players[playerIndex].units.findIndex(u => u.id === unit.id);
-        if (unitIndex === -1) return state;
-        
-        // Update the unit's position
-        const updatedPlayers = [...state.players];
-        updatedPlayers[playerIndex].units[unitIndex] = {
-          ...updatedPlayers[playerIndex].units[unitIndex],
-          x,
-          y,
-          movesLeft: unit.movesLeft - 1
-        };
-        
-        return { players: updatedPlayers };
-      });
-      
-      // Tell Phaser to move the unit
+      // Since Phaser is the source of truth, we only need to notify Phaser
+      // Phaser will handle the movement logic and send back an event with the updated state
       EventBridge.emit('ui:moveUnit', { unitId: unit.id, x, y });
     },
     
     buildBuilding: (buildingType, x, y) => {
-      set(state => {
-        const currentPlayer = state.players.find(p => p.id === state.currentPlayer.id);
-        if (!currentPlayer) return state;
-        
-        // Check if player has enough resources
-        const costs = {
-          city: { food: 5, production: 10 },
-          barracks: { food: 2, production: 5 }
-        };
-        
-        if (currentPlayer.resources.food < costs[buildingType].food || 
-            currentPlayer.resources.production < costs[buildingType].production) {
-          console.log("Not enough resources to build structure");
-          return state;
-        }
-        
-        // Deduct resources
-        const updatedPlayers = state.players.map(player => {
-          if (player.id === currentPlayer.id) {
-            return {
-              ...player,
-              resources: {
-                food: player.resources.food - costs[buildingType].food,
-                production: player.resources.production - costs[buildingType].production
-              }
-            };
-          }
-          return player;
-        });
-        
-        // Tell Phaser to build the building
-        EventBridge.emit('game:buildBuilding', { buildingType, x, y });
-        
-        return { players: updatedPlayers };
-      });
+      // Let Phaser handle the resource check and building creation
+      // Phaser will emit events with updated resources and the new building
+      EventBridge.emit('game:buildBuilding', { buildingType, x, y });
     },
     
     trainUnit: (unitType, buildingId) => {
-      set(state => {
-        const currentPlayer = state.players.find(p => p.id === state.currentPlayer.id);
-        if (!currentPlayer) return state;
-        
-        // Check if player has enough resources
-        const costs = {
-          worker: { food: 2, production: 1 },
-          melee: { food: 1, production: 3 },
-          ranged: { food: 1, production: 4 }
-        };
-        
-        if (currentPlayer.resources.food < costs[unitType].food || 
-            currentPlayer.resources.production < costs[unitType].production) {
-          console.log("Not enough resources to train unit");
-          return state;
-        }
-        
-        // Deduct resources
-        const updatedPlayers = state.players.map(player => {
-          if (player.id === currentPlayer.id) {
-            return {
-              ...player,
-              resources: {
-                food: player.resources.food - costs[unitType].food,
-                production: player.resources.production - costs[unitType].production
-              }
-            };
-          }
-          return player;
-        });
-        
-        // Tell Phaser to train the unit
-        EventBridge.emit('game:trainUnit', { buildingId, unitType });
-        
-        return { players: updatedPlayers };
-      });
+      // Let Phaser handle resource checks and unit creation
+      // Phaser will emit events with updated resources and the new unit
+      EventBridge.emit('game:trainUnit', { buildingId, unitType });
     },
     
     attack: (attacker, defender) => {
