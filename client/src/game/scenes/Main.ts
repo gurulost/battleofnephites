@@ -55,21 +55,62 @@ export default class MainScene extends Phaser.Scene {
     this.load.svg('attack-indicator', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/target.svg');
     this.load.svg('gather-indicator', 'https://cdn.jsdelivr.net/npm/feather-icons@4.29.0/dist/icons/tool.svg');
     
-    // Load unit assets - using generic versions for both factions for now
-    this.load.svg('nephite-worker', 'src/assets/units/worker.svg');
-    this.load.svg('nephite-melee', 'src/assets/units/melee.svg');
-    this.load.svg('nephite-ranged', 'src/assets/units/ranged.svg');
+    // Load unit assets for all factions
+    // Nephites
+    this.load.svg('nephite-worker', 'assets/images/units/nephite-worker.svg');
+    this.load.svg('nephite-melee', 'assets/images/units/nephite-melee.svg');
+    this.load.svg('nephite-ranged', 'assets/images/units/nephite-ranged.svg');
     
-    // Using the same assets for both factions temporarily
-    this.load.svg('lamanite-worker', 'src/assets/units/worker.svg');
-    this.load.svg('lamanite-melee', 'src/assets/units/melee.svg');
-    this.load.svg('lamanite-ranged', 'src/assets/units/ranged.svg');
+    // Lamanites
+    this.load.svg('lamanite-worker', 'assets/images/units/lamanite-worker.svg');
+    this.load.svg('lamanite-melee', 'assets/images/units/lamanite-melee.svg');
+    this.load.svg('lamanite-ranged', 'assets/images/units/lamanite-ranged.svg');
     
-    // Load building assets - using generic versions for both factions for now
-    this.load.svg('nephite-city', 'src/assets/buildings/city.svg');
-    this.load.svg('nephite-barracks', 'src/assets/buildings/barracks.svg');
-    this.load.svg('lamanite-city', 'src/assets/buildings/city.svg');
-    this.load.svg('lamanite-barracks', 'src/assets/buildings/barracks.svg');
+    // Mulekites
+    this.load.svg('mulekites-worker', 'assets/images/units/mulekites-worker.svg');
+    this.load.svg('mulekites-melee', 'assets/images/units/mulekites-melee.svg');
+    this.load.svg('mulekites-ranged', 'assets/images/units/mulekites-ranged.svg');
+    
+    // Anti-Nephi-Lehies
+    this.load.svg('anti-nephi-lehies-worker', 'assets/images/units/anti-nephi-lehies-worker.svg');
+    this.load.svg('anti-nephi-lehies-melee', 'assets/images/units/anti-nephi-lehies-melee.svg');
+    this.load.svg('anti-nephi-lehies-ranged', 'assets/images/units/anti-nephi-lehies-ranged.svg');
+    
+    // Jaredites
+    this.load.svg('jaredites-worker', 'assets/images/units/jaredites-worker.svg');
+    this.load.svg('jaredites-melee', 'assets/images/units/jaredites-melee.svg');
+    this.load.svg('jaredites-ranged', 'assets/images/units/jaredites-ranged.svg');
+    
+    // Load building assets for all factions
+    // Nephites
+    this.load.svg('nephite-city', 'assets/images/buildings/nephite-city.svg');
+    this.load.svg('nephite-barracks', 'assets/images/buildings/nephite-barracks.svg');
+    
+    // Lamanites
+    this.load.svg('lamanite-city', 'assets/images/buildings/lamanite-city.svg');
+    this.load.svg('lamanite-barracks', 'assets/images/buildings/lamanite-barracks.svg');
+    
+    // Mulekites
+    this.load.svg('mulekites-city', 'assets/images/buildings/mulekites-city.svg');
+    this.load.svg('mulekites-barracks', 'assets/images/buildings/mulekites-barracks.svg');
+    
+    // Anti-Nephi-Lehies
+    this.load.svg('anti-nephi-lehies-city', 'assets/images/buildings/anti-nephi-lehies-city.svg');
+    this.load.svg('anti-nephi-lehies-barracks', 'assets/images/buildings/anti-nephi-lehies-barracks.svg');
+    
+    // Jaredites
+    this.load.svg('jaredites-city', 'assets/images/buildings/jaredites-city.svg');
+    this.load.svg('jaredites-barracks', 'assets/images/buildings/jaredites-barracks.svg');
+    
+    // Load sound effects
+    this.load.audio('attack', 'assets/sounds/attack.mp3');
+    this.load.audio('build', 'assets/sounds/build.mp3');
+    this.load.audio('gather', 'assets/sounds/gather.mp3');
+    this.load.audio('move', 'assets/sounds/move.mp3');
+    this.load.audio('select', 'assets/sounds/select.mp3');
+    this.load.audio('unit-created', 'assets/sounds/unit-created.mp3');
+    this.load.audio('victory', 'assets/sounds/victory.mp3');
+    this.load.audio('defeat', 'assets/sounds/defeat.mp3');
   }
 
   create() {
@@ -174,26 +215,44 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
     
-    // Default initialization if no custom setup
-    // Human player (Nephites)
+    // Get the selected faction from game setup store
+    // Attempt to access game setup state from window object where it might be stored by React
+    const gameSetupState = (window as any).gameSetupState;
+    
+    // Default values if game setup state isn't available
+    const selectedFaction = gameSetupState?.selectedFaction || 'nephites';
+    const numberOfOpponents = gameSetupState?.opponents || 1;
+    
+    // Available factions for AI opponents
+    const availableFactions: any[] = ['nephites', 'lamanites', 'mulekites', 'anti-nephi-lehies', 'jaredites'];
+    
+    // Filter out player's faction from available AI factions
+    const aiFactions = availableFactions.filter(faction => faction !== selectedFaction);
+    
+    // Human player with selected faction
     this.players.push({
       id: 'player1',
-      faction: 'nephites',
+      faction: selectedFaction,
       resources: { food: 10, production: 10 },
       units: [],
       buildings: [],
       startingCityId: 'city1'
     });
     
-    // AI player (Lamanites)
-    this.players.push({
-      id: 'player2',
-      faction: 'lamanites',
-      resources: { food: 10, production: 10 },
-      units: [],
-      buildings: [],
-      startingCityId: 'city2'
-    });
+    // Add AI opponents based on setup
+    for (let i = 0; i < numberOfOpponents; i++) {
+      // Select a faction for the AI, cycling through available factions if needed
+      const aiFaction = aiFactions[i % aiFactions.length];
+      
+      this.players.push({
+        id: `player${i + 2}`,
+        faction: aiFaction,
+        resources: { food: 10, production: 10 },
+        units: [],
+        buildings: [],
+        startingCityId: `city${i + 2}`
+      });
+    }
     
     // Set current player to human
     this.currentPlayerIndex = 0;

@@ -63,10 +63,18 @@ export default class Building extends Phaser.GameObjects.Container {
     // Initialize production queue if provided
     this.productionQueue = config.productionQueue || [];
     
-    // Create sprite based on building type (for now using generic sprites regardless of faction)
-    // const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
-    // this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
-    this.sprite = scene.add.image(0, 0, type);
+    // Create sprite based on building type and faction
+    // Determine the faction based on player ID
+    let faction = 'nephites'; // Default faction
+    
+    // Find the player's faction from the players array
+    const playerEntity = (scene as any).players?.find((p: any) => p.id === this.playerId);
+    if (playerEntity && playerEntity.faction) {
+      faction = playerEntity.faction;
+    }
+    
+    // Use faction-specific building sprites
+    this.sprite = scene.add.image(0, 0, `${faction}-${type}`);
     
     // Set origin to bottom-center for isometric positioning
     this.sprite.setOrigin(0.5, 1);
@@ -206,10 +214,18 @@ export default class Building extends Phaser.GameObjects.Container {
     
     // If there's something in the queue, show production icon
     if (this.productionQueue.length > 0) {
-      // Show the unit type that's being produced (using generic sprites for now)
-      // const faction = this.playerId === 'player1' ? 'nephite' : 'lamanite';
+      // Get the unit type being produced
       const unitType = this.productionQueue[0];
-      this.productionIcon = this.scene.add.image(15, -35, unitType);
+      
+      // Determine the faction
+      let faction = 'nephites'; // Default faction
+      const playerEntity = (this.scene as any).players?.find((p: any) => p.id === this.playerId);
+      if (playerEntity && playerEntity.faction) {
+        faction = playerEntity.faction;
+      }
+      
+      // Use faction-specific unit sprites for the production icon
+      this.productionIcon = this.scene.add.image(15, -35, `${faction}-${unitType}`);
       this.productionIcon.setScale(0.5);
       this.add(this.productionIcon);
     }

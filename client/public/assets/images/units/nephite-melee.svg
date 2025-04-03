@@ -1,0 +1,58 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Melee Unit - Book of Mormon themed -->
+  
+  <!-- Base/Shadow -->
+  <ellipse cx="32" cy="54" rx="20" ry="10" fill="#333333" opacity="0.3"/>
+  
+  <!-- Body -->
+  <g transform="translate(32, 36)">
+    <!-- Armor/Tunic -->
+    <path d="M -10,0 L -8,16 L 8,16 L 10,0 Z" fill="#7B5E57"/>
+    
+    <!-- Chest plate -->
+    <path d="M -8,-4 L -6,10 L 6,10 L 8,-4 Z" fill="#8D6E63"/>
+    <path d="M -6,-2 L -4,8 L 4,8 L 6,-2 Z" fill="#5D4037"/>
+    
+    <!-- Belt -->
+    <rect x="-10" y="-2" width="20" height="4" fill="#3E2723"/>
+    
+    <!-- Legs -->
+    <rect x="-8" y="16" width="6" height="6" fill="#5D4037"/>
+    <rect x="2" y="16" width="6" height="6" fill="#5D4037"/>
+  </g>
+  
+  <!-- Head and upper body -->
+  <g transform="translate(32, 28)">
+    <!-- Weapon arm -->
+    <line x1="-12" y1="0" x2="-18" y2="-8" stroke="#8D6E63" stroke-width="3" stroke-linecap="round"/>
+    <line x1="-18" y1="-8" x2="-24" y2="4" stroke="#5D4037" stroke-width="2" stroke-linecap="round"/>
+    
+    <!-- Sword -->
+    <line x1="-24" y1="4" x2="-30" y2="-8" stroke="#A0A0A0" stroke-width="2"/>
+    <path d="M -32,-10 L -28,-10 L -30,-14 Z" fill="#A0A0A0"/>
+    
+    <!-- Shield arm -->
+    <line x1="12" y1="0" x2="16" y2="4" stroke="#8D6E63" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Shield -->
+    <path d="M 16,0 L 24,0 L 24,12 L 20,16 L 16,12 Z" fill="#CD853F"/>
+    <path d="M 18,4 L 22,4 L 22,10 L 20,12 L 18,10 Z" fill="#A0522D"/>
+    
+    <!-- Neck -->
+    <rect x="-2" y="-4" width="4" height="4" fill="#8D6E63"/>
+    
+    <!-- Head -->
+    <circle cx="0" cy="-12" r="8" fill="#A67C52"/>
+    
+    <!-- Hair - warrior style -->
+    <path d="M -8,-12 A 8,8 0 0 1 8,-12 L 8,-8 L -8,-8 Z" fill="#3E2723"/>
+    
+    <!-- Helmet -->
+    <path d="M -8,-16 A 8,4 0 0 1 8,-16 L 6,-10 L -6,-10 Z" fill="#A0522D"/>
+    
+    <!-- Simple face details -->
+    <circle cx="-3" cy="-13" r="1" fill="#3E2723"/>
+    <circle cx="3" cy="-13" r="1" fill="#3E2723"/>
+    <path d="M -2,-10 A 4,3 0 0 0 2,-10" fill="none" stroke="#3E2723" stroke-width="1"/>
+  </g>
+</svg>

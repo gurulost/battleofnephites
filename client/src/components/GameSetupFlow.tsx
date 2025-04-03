@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useGameSetup } from '../lib/stores/useGameSetup';
 import { GameModeSelect } from './setup/GameModeSelect';
 import { FactionSelect } from './setup/FactionSelect';
@@ -9,7 +10,28 @@ interface GameSetupFlowProps {
 }
 
 export const GameSetupFlow = ({ onStartGame }: GameSetupFlowProps) => {
-  const { setupPhase, goToNextPhase } = useGameSetup();
+  const { setupPhase, goToNextPhase, selectedFaction, opponents, difficulty, selectedMode } = useGameSetup();
+  
+  // Expose the game setup state to the window object for Phaser to access
+  useEffect(() => {
+    // Make game setup state available globally for Phaser
+    (window as any).gameSetupState = {
+      selectedFaction,
+      opponents, 
+      difficulty,
+      selectedMode
+    };
+    
+    // Clean up on unmount
+    return () => {
+      // Keep the state available even after unmount so Phaser can use it
+      // but we'll mark it as inactive
+      (window as any).gameSetupState = {
+        ...((window as any).gameSetupState || {}),
+        active: false
+      };
+    };
+  }, [selectedFaction, opponents, difficulty, selectedMode]);
   
   const handleLoadingComplete = () => {
     // This advances to the game phase in the setup state
